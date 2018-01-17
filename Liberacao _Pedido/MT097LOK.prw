@@ -1,6 +1,20 @@
 #include 'protheus.ch'
 #include 'parmtype.ch'
 
+#Define CRLF Chr(13)+Chr(10)
+
+#Define P_SALDO 1 //|Posicao do Saldo
+#Define P_MOEDA 2 //| Posicao da Moeda
+#Define P_DTSLD 3 //| Posicao Data do Saldo
+
+// Status da Liberacao
+#Define SL_AGUARDANDO "01" // Aguardando nivel anterior
+#Define SL_PENDENTE	  "02" // Pendente
+#Define SL_LIBERADO   "03" // Liberado
+#Define SL_BLOQUEADO  "04" // Bloqueado
+#Define SL_LIBOUTROU  "05" // Liberado por outro Usuario
+#Define SL_REJEITADO  "06" // Rejeitado
+
 /*****************************************************************************\
 **---------------------------------------------------------------------------**
 ** Ponto Entrada: MT097LOK  | AUTOR : Cristiano Machado | DATA : 15/01/2018  **
@@ -28,60 +42,37 @@
 \*---------------------------------------------------------------------------*/
 *******************************************************************************
 User Function MT097LOK()
-	*******************************************************************************
-	cDoc := Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
+*******************************************************************************
 
-	lContinua := !Iw_Msgbox(" MT097LOK -> Deseja Substituir a Liberacao de Compras : ","Lib Compras Cuztomizada", "YESNO")
+	//| Funcao para Declarar Variaveis Necessarias
+	DecVar()
 
-	Alert("Retorno: " + cValToChar(lContinua))
+	//| Funcao para Alimentar as Variaveis
+	GetVar()
 
-	Alert("SCR: " + cDoc )
+	//| Selecionar e Ordenar Tabelas Envolvidas
+	TabSel()
 
-	DbSelectArea("SC7")
-	DbSetOrder(1)
-	MsSeek(xFilial("SC7")+cDoc)
-	Alert("SC7: " + cDoc)
-	
-	dbSelectArea("SAL")       
-	dbSetOrder(3)
-	MsSeek(xFilial("SAL")+SC7->C7_APROV+SAK->AK_COD) 
-	If SAL->AL_LIBAPR != "A" //Tipo de Aprovacao -> V=Visto;A=Aprovador
-		lAprov := .T.
-		cAprov := OemToAnsi("VISTO / LIVRE") 
-	EndIf	
-	
-	//| Verifica se o pedido de compra nao esta com lock
-	//|    A097Lock(Codigo do Documento , Tipo de Documento "PC->Pedido de Compras")
-	lLibOk := VerLock(cDoc,SCR->CR_TIPO)
+	//| Posiciona as Tabelas Envolvidas
+	PosReg()
 
-	Alert("lLibOk: " + cValToChar(lLibOk))
+	//| Validações
+	If ValLib()
 
-	Pos_SALDO		:= 1 // Saldo Disponivel
-	Pos_MOEDA   	:= 2 // Moeda Utilizada
-	Pos_DATA		:= 3 // Data do Saldo
-	cObs 			:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
-	cCodLiber 		:= SCR->CR_APROV // Codigo do Aprovador
-	cAprovS 		:= SAK->AK_APROSUP // Aprovador Superior
-	dDataRef 		:= dDataBase
-	aRetSaldo 		:= MaSalAlc(cCodLiber,dDataRef)
-	cGrupo 			:= SC7->C7_APROV
-	nTotal 			:= xMoeda(SCR->CR_TOTAL,SCR->CR_MOEDA,aRetSaldo[Pos_MOEDA],SCR->CR_EMISSAO,,SCR->CR_TXMOEDA)
+		TelaLib() //|  Monta a Leta de Liberaçào
+
+	EndIf
+
+	//| Restaura o Ambiente
+	ResEnv()
+
+	Return lContinua
+*******************************************************************************
+Static Function Libera() // Executa a Liberacao do Pedido ...
+*******************************************************************************
+
+	// Liberacao
 	nOpc := 2 // 2-> Liberar  1->Cancelar  3->Bloquear
-	nSalDif 		:= aRetSaldo[Pos_SALDO] - IIF(lAprov,0,nTotal)
-		
-	aDocto 		:= 	{	cDoc ,; 		//| [1] Numero do documento
-	SCR->CR_TIPO,; 	//| [2] Tipo de Documento
-	nTotal,;		//| [3] Valor do Documento
-	cCodLiber,;		//| [4] Codigo do Aprovador
-	Nil,;			//| [5] Codigo do Usuario
-	cGrupo,;		//| [6] Grupo do Aprovador
-	Nil,;			//| [7] Aprovador Superior
-	Nil,;			//| [8] Moeda do Documento
-	Nil,;			//| [9] Taxa da Moeda
-	Nil,;			//| [10] Data de Emissao do Documento
-	cObs,;			//| [11] Grupo de Compras ou Oservacao
-	Nil}			//| [12] Aprovador Original
-
 	/*
 	ExpN1 = Operacao a ser executada
 	1 = Inclusao do documento
@@ -91,48 +82,154 @@ User Function MT097LOK()
 	5 = Estorno da Aprovacao
 	6 = Bloqueio Manual da Aprovacao
 	*/
-	nOpc := 4 // Aprovar/Liberar
-	//nOpc := 6 // Bloqueio
+	lLiberou := MaAlcDoc(aDocALib,dDataAtual,If(nOpc==2,4,6))
 
-	If nOpc == 4 .And. (nSalDif) < 0
-		Help(" ",1,"A097SALDO") //Aviso(STR0040,STR0041,{STR0037},2) //"Saldo Insuficiente"###"Saldo na data insuficiente para efetuar a liberacao do pedido. Verifique o saldo disponivel para aprovacao na data e o valor total do pedido."###"Voltar"
-		nOpc := 1  //Cancela Operação
+	Return Nil
+
+*******************************************************************************
+Static Function DecVar() //| Deeclaracao das Variaveis utilizadas 
+*******************************************************************************
+
+	_SetOwnerPrvt( 'aGetATU'	, {}  ) //| Salva Area Atual
+	_SetOwnerPrvt( 'aGetSC7'	, {}  ) //| Salva Area SC7
+	_SetOwnerPrvt( 'aGetSCR'	, {}  ) //| Salva Area SCR
+	_SetOwnerPrvt( 'aGetSAK'	, {}  ) //| Salva Area SAK
+	_SetOwnerPrvt( 'aGetSAL'	, {}  ) //| Salva Area SAL
+
+	_SetOwnerPrvt( 'cCR_NUM'	, ""  ) //| Documento a ser Liberado
+	_SetOwnerPrvt( 'cCR_TIPO'	, ""  ) //| Tipo do Documento
+	_SetOwnerPrvt( 'cCR_APROV'	, ""  ) //| Codigo do Aprovador
+	_SetOwnerPrvt( 'cCR_GRUPO'	, ""  ) //| Grupo de Aprovacao
+	_SetOwnerPrvt( 'cCR_APRORI'	, ""  ) //| Codigo Aprovador Origem
+	_SetOwnerPrvt( 'cCR_STATUS'	, ""  ) //| Controle da Aprovacao
+
+	_SetOwnerPrvt( 'cCR_OBS'	, ""  ) //| Obsevacoes da Aprovacao
+	_SetOwnerPrvt( 'cCR_TOTAL'	, ""  ) //| Valor Total
+
+	_SetOwnerPrvt( 'cAK_APROSUP', ""  ) // Aprovador Superior
+
+	SAK->AK_APROSUP
+
+	_SetOwnerPrvt( 'dDataAtual'	, dDataBase ) //| DataBase do sistema
+
+	_SetOwnerPrvt( 'aDocALib'	, {} ) //| Array contendo o Documento a Liberar ...
+	_SetOwnerPrvt( 'aRetSaldo'	, {} ) //| Retorna o saldo do aprovador.   Return {nSaldo,nMoeda,dDtSaldo}
+	_SetOwnerPrvt( 'nSldDisp'	, 0  ) //| Armazena o saldo disponivel para liberacao ja contando  o documento a ser liberado
+
+	_SetOwnerPrvt( 'lContinua'	, .F. ) //| Define se Substitui Liberação Padrao
+
+	Return Nil
+*******************************************************************************
+Static Function GetVar() //| Funcao para Alimentar as Variaveis
+*******************************************************************************
+	Local lAprov := .F.
+
+	aGetATU		:= GetArea()
+	aGetSC7 	:= SC7->( GetArea() )
+	aGetSCR 	:= SCR->( GetArea() )
+	aGetSAK 	:= SAL->( GetArea() )
+	aGetSAL 	:= SAL->( GetArea() )
+
+	cCR_NUM 	:= Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
+	cCR_APROV 	:= SCR->CR_APROV
+	cCR_GRUPO	:= SCR->CR_GRUPO
+	cCR_APRORI  := SCR->CR_APRORI
+	cCR_STATUS  := SCR->CR_STATUS
+	cCR_TIPO	:= SCR->CR_TIPO
+	cCR_OBS		:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
+
+	aRetSaldo   := MaSalAlc(cCR_APROV,dDataAtual)
+
+	cCR_TOTAL 	:= xMoeda(SCR->CR_TOTAL, SCR->CR_MOEDA, aRetSaldo[P_MOEDA], SCR->CR_EMISSAO, , SCR->CR_TXMOEDA)
+
+	cAK_APROSUP := SAK->AK_APROSUP
+
+	aDocALib	:= {cCR_NUM,cCR_TIPO,cCR_TOTAL,cCR_APROV,,cCR_GRUPO,,,,,cCR_OBS}
+
+	If SAL->AL_LIBAPR != "A"
+		lAprov := .T.
 	EndIf
-	/*
-	Descri‡…o ³ Controla a alcada dos documentos (SCS-Saldos/SCR-Bloqueios)
-	Sintaxe   ³ MaAlcDoc(aDocto,dDataRef,nOpc,ExpC1,ExpL1)
-	*/
-	lLiberou := MaAlcDoc(aDocto,dDataRef,nOpc)
 
-	// Envia e-mail ao comprador ref. Liberacao do pedido para compra- 034³
-	If lLiberou
-		cPCLib  := SC7->C7_NUM
-		cPCUser := SC7->C7_USER
-		Alert("Liberou Pedido - Send eamil ")
-		MLibPed(lLiberou)
-		//MEnviaMail("034",{cPCLib,SCR->CR_TIPO},cPCUser)
-	Endif
-	*/
+	nSldDisp := aRetSaldo[P_SALDO] - IIF(lAprov,0,nTotal)
 
-
-SC7->(MsUnlockAll())
-
-DbSelectArea("SC7")
-If ExistBlock("MT097END")
-	///ExecBlock("MT097END",.F.,.F.,{cDocto,cTipo,nOpc,cFilDoc})
-EndIf
-
-Return 
-
-//Verifica se o pedido de compra nao esta com lock
+	Return Nil
 *******************************************************************************
-Static Function VerLock(cNumero,cTipo)
+Static Function TabSel()  //| Selecionar e Ordenar Tabelas Envolvidas
 *******************************************************************************
+
+	DbSelectarea("SCR") //| Documentos com Alcada
+	DbSetOrder(1) //CR_FILIAL+CR_TIPO+CR_NUM+CR_NIVEL
+
+	DbSelectArea("SC7")  //| Ped.Compra / Aut.Entrega
+	DbSetOrder(1) //| C7_FILIAL+C7_NUM+C7_ITEM+C7_SEQUEN
+
+	DbSelectArea("SAK") //| Aprovadores
+	DbSetOrder(1) //| AK_FILIAL+AK_COD
+
+	DbSelectArea("SAL")  //| Grupos de Aprovacao
+	DbSetOrder(3) //| AL_FILIAL+AL_COD+AL_APROV
+
+	Return Nil
+*******************************************************************************
+Static Function PosReg() //| Posiciona as Tabelas Envolvidas
+*******************************************************************************
+
+	MsSeek(xFilial("SC7")+cCR_NUM)
+
+	SAK->(dbSeek(xFilial("SAK")+cCR_APROV))
+
+	MsSeek(xFilial("SAL")+SC7->C7_APROV+SAK->AK_COD)
+
+	Return Nil
+*******************************************************************************
+Static Function ValLib() //| Validações para Ocorrer a Liberação...
+*******************************************************************************
+	Local lValido 	:= .T.
+	Local lOGpaAprv := SuperGetMv("MV_OGPAPRV",.F.,.F.) // Obrigatorio Aprovador existir no Grupo Aprovacao para efetuar a liberacao de documentos    ?
+
+	Local cMen001 := "O Aprovador nao foi encontrado no Grupo de Aprovacao deste Documeto, verifique . Se Necessario inclua novamente o Aprovador no Grupo..."
+	Local cMen002 := "Este pedido ja foi liberado anteriormente. Somente os pedidos que estao aguardando liberacao (destacado em vermelho no Browse) poderao ser liberados."
+	Local cMen003 := "Esta operacao nao pode ser realizada, pois este registro se encontra bloqueado pelo sistema (aguardando outros niveis)"
+	Local cMen004 := "Saldo na data insuficiente para efetuar a liberacao do pedido. Verifique o saldo disponivel para aprovacao na data e o valor total do pedido."
+
+	DbSelectArea("SCR")
+	If lValido .And. !Empty(SCR->CR_DATALIB) .And. ( SCR->CR_STATUS = SL_LIBERADO .Or. SCR->CR_STATUS ==  SL_LIBOUTROU )
+		Aviso("A097NOAPRV",cMen002 + CRLF + cCR_NUM,{"Ok"})
+		lValido := .F.
+	EndIf
+
+	If lValido .And. SCR->CR_STATUS == SL_AGUARDANDO
+		Aviso("A097NOAPRV",cMen003 + CRLF + cCR_NUM,{"Ok"})
+		lValido := .F.
+	EndIf
+
+	DbSelectArea("SAL")
+	If !MsSeek(xFilial("SAL")+cCR_GRUPO+cCR_APROV) .And. !MsSeek(xFilial("SAL")+cCR_GRUPO+cCR_APRORI) .And. lOGpaAprv
+		Aviso("A097NOAPRV",cMen001 + CRLF + cCR_GRUPO,{"Ok"})
+		lValido := .F.
+	EndIf
+
+	If lValido .And. nSldDisp < 0
+		Aviso("A097NOAPRV",cMen004 + CRLF + cValToChar(nSldDisp) ,{"Ok"})
+		lValido := .F.
+	EndIf
+
+	If lValido .And. !VerLock(cCR_NUM, cCR_TIPO) //Verifica se o pedido de compra nao esta com lock
+		Aviso("A097NOAPRV",cMen003 + CRLF + cCR_NUM,{"Ok"})
+	EndIf
+
+	Return lValido
+*******************************************************************************
+Static Function VerLock(cCR_NUM,cTipo) //| Verifica se o pedido de compra nao esta com lock (Codigo do Documento , Tipo de Documento "PC->Pedido de Compras")
+*******************************************************************************
+	Local cNumPed 	:= ""
+	Local lRet 		:= .F.
+
 	aArea := SC7->(GetArea())
-	dbSelectArea("SC7")
-	dbSetOrder(1)
-	If MsSeek(xFilial("SC7")+cNumero)
-		While !Eof() .And. SC7->C7_FILIAL+Substr(SC7->C7_NUM,1,len(SC7->C7_NUM)) == xFilial("SC7")+cNumero
+	DbSelectArea("SC7")
+	If MsSeek(xFilial("SC7")+cCR_NUM)
+		cNumPed := Substr(SC7->C7_NUM,1,len(SC7->C7_NUM))
+		While !Eof() .And. SC7->C7_FILIAL + cNumPed == xFilial("SC7") + cCR_NUM
 			If RecLock("SC7")
 				lRet := .T.
 			Else
@@ -145,10 +242,10 @@ Static Function VerLock(cNumero,cTipo)
 
 	RestArea(aArea)
 
-Return lRet
-// Marca o Pedido como Liberado ....
+	Return lRet
+
 *******************************************************************************
-Static Function MLibPed(lLiberou)
+Static Function MLibPed(lLiberou)//| Marca o Pedido como Liberado ....
 *******************************************************************************
 	If (SCR->CR_TIPO == "PC" .Or. SCR->CR_TIPO == "AE")
 		dbSelectArea("SC7")
@@ -164,4 +261,21 @@ Static Function MLibPed(lLiberou)
 		EndDo
 	EndIf
 
-Return 
+	Return Nil 
+*******************************************************************************
+Static Function ResEnv()// Restaura o Ambiente
+*******************************************************************************
+
+	SC7->(MsUnlockAll())
+	RestArea(aGetSC7)
+	RestArea(aGetSCR)
+	RestArea(aGetSAK)
+	RestArea(aGetSAL)
+	RestArea(aGetATU)
+
+	DbSelectArea("SC7")
+	If ExistBlock("MT097END")
+		///ExecBlock("MT097END",.F.,.F.,{cDocto,cTipo,nOpc,cFilDoc})
+	EndIf
+
+Return Nil 	
