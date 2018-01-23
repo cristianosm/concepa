@@ -17,6 +17,11 @@
 
 #define CLR_GRAY RGB( 220, 220, 220 )
 
+#Define CONTROL_ALIGN_LEFT 	 -1
+#Define CONTROL_ALIGN_CENTER  0
+#Define CONTROL_ALIGN_RIGHT   1
+
+#Define MASCARA "@E 999,999.99"
 
 /*****************************************************************************\
 **---------------------------------------------------------------------------**
@@ -63,7 +68,6 @@ User Function MT094LOK()
 	If ValLib()
 
 		TelaLib() //|  Monta a Leta de Liberaçào
-		Libera()
 		
 	EndIf
 
@@ -97,10 +101,16 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 	_SetOwnerPrvt( 'nCR_TOTAL'	, ""  ) //| Valor Total Numerico
 	
 	_SetOwnerPrvt( 'cAK_APROSUP', ""  ) // Aprovador Superior
+	_SetOwnerPrvt( 'cAK_Nome', ""  ) // Nome do Aprovador 
+
+	_SetOwnerPrvt( 'cCUserLog', RetCodUsr()  ) // Usuario Logado 
+	_SetOwnerPrvt( 'cCUserName', UsrRetName(cCUserLog)  ) // Nome do Usuario Logado 
+
 
 	// SAK->AK_APROSUP
 
 	_SetOwnerPrvt( 'dDataAtual'	, dDataBase ) //| DataBase do sistema
+	_SetOwnerPrvt( 'cDataRef'	, '' ) //| Data caracter atual 
 
 	_SetOwnerPrvt( 'aDocALib'	, {} ) //| Array contendo o Documento a Liberar ...
 	_SetOwnerPrvt( 'aRetSaldo'	, {} ) //| Retorna o saldo do aprovador.   Return {nSaldo,nMoeda,dDtSaldo}
@@ -123,7 +133,7 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 
 
 	cCR_NUM 	:= Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
-	cCR_FORNECE := ""
+	cCR_FORNECE := Posicione("SA2",1,xFilial("SA2")+SC7->C7_FORNECE+SC7->C7_LOJA ,"A2_NOME")
 	cCR_EMISSAO := DtoC(SCR->CR_EMISSAO)
 	cCR_APROV 	:= SCR->CR_APROV
 	cCR_GRUPO	:= SCR->CR_GRUPO
@@ -131,15 +141,18 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 	cCR_STATUS  := SCR->CR_STATUS
 	cCR_TIPO	:= SCR->CR_TIPO
 	cCR_OBS		:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
+	
+	cDataRef 	:= DtoC(dDataBase)
 
 	aRetSaldo   := MaSalAlc(cCR_APROV,dDataAtual)
 
 	nCR_TOTAL 	:= xMoeda(SCR->CR_TOTAL, SCR->CR_MOEDA, aRetSaldo[P_MOEDA], SCR->CR_EMISSAO, , SCR->CR_TXMOEDA)
 
-	cCR_TOTAL   := Transform( nCR_TOTAL , "@E 999,999,999.99" ) 
+	cCR_TOTAL   := Transform( nCR_TOTAL , MASCARA ) 
 	
 	cAK_APROSUP := SAK->AK_APROSUP
-
+	cAK_Nome	:= SAK->AK_NOME
+	
 	aDocALib	:= {cCR_NUM,cCR_TIPO,nCR_TOTAL,cCR_APROV,,cCR_GRUPO,,,,,cCR_OBS}
 
 	If SAL->AL_LIBAPR != "A"
@@ -164,17 +177,26 @@ Static Function TabSel()  //| Selecionar e Ordenar Tabelas Envolvidas
 
 	DbSelectArea("SAL")  //| Grupos de Aprovacao
 	DbSetOrder(3) //| AL_FILIAL+AL_COD+AL_APROV
+	
+	Dbselectarea("SZG")
+    Dbsetorder(1)
 
 	Return Nil
 *******************************************************************************
 Static Function PosReg() //| Posiciona as Tabelas Envolvidas
 *******************************************************************************
 
+	DbSelectArea("SC7")
 	MsSeek(xFilial("SC7")+cCR_NUM)
 
-	SAK->(dbSeek(xFilial("SAK")+cCR_APROV))
+	DbSelectArea("SAK")
+	dbSeek(xFilial("SAK")+cCR_APROV)
 
+	DbSelectArea("SAL")
 	MsSeek(xFilial("SAL")+SC7->C7_APROV+SAK->AK_COD)
+	
+	DbSelectArea("SZG")
+	Dbseek( xFilial("SZG") + SC7->C7_CTAGER, .F.)
 
 	Return Nil
 *******************************************************************************
@@ -189,39 +211,47 @@ Static Function ValLib() //| Validações para Ocorrer a Liberação...
 	Local cMen004 := "Saldo na data insuficiente para efetuar a liberacao do pedido. Verifique o saldo disponivel para aprovacao na data e o valor total do pedido."
 	Local cMen005 := "Esta operacao nao pode ser realizada, pois o Pedido de Compras correspondente não foi localizado."
 	Local cMen006 := "Esta operacao nao pode ser realizada, pois este registro se encontra bloqueado por outro Usuário. (Tente mais tarde)"
+	Local cMen007 := "Esta operação não poderá ser realizada pois o usuário aprovador não confere com o registro selecionado. Selecione o registro correspondente ao usuário aprovador"	
 	
 	DbSelectArea("SCR")
 	If lValido .And. !Empty(SCR->CR_DATALIB) .And. ( SCR->CR_STATUS = SL_LIBERADO .Or. SCR->CR_STATUS ==  SL_LIBOUTROU )
-		Aviso("VAL002",cMen002 + CRLF + " Documento: " + cCR_NUM,{"Ok"})
+		Aviso("VAL002", cMen002 + CRLF + " Documento: " + cCR_NUM,{"Ok"})
 		lValido := .F.
 	EndIf
 
 	If lValido .And. SCR->CR_STATUS == SL_AGUARDANDO
-		Aviso("VAL003",cMen003 + CRLF + " Documento: "+ cCR_NUM,{"Ok"})
+		Aviso("VAL003", cMen003 + CRLF + " Documento: "+ cCR_NUM,{"Ok"})
 		lValido := .F.
 	EndIf
 
 	DbSelectArea("SAL")
 	If !MsSeek(xFilial("SAL")+cCR_GRUPO+cCR_APROV) .And. !MsSeek(xFilial("SAL")+cCR_GRUPO+cCR_APRORI) .And. lOGpaAprv
-		Aviso("VAL001",cMen001 + CRLF + " Grupo: "+ cCR_GRUPO,{"Ok"})
+		Aviso("VAL001", cMen001 + CRLF + " Grupo: "+ cCR_GRUPO,{"Ok"})
 		lValido := .F.
 	EndIf
 
 	If lValido .And. nSldDisp < 0
-		Aviso("VAL004",cMen004 + CRLF + " Saldo Disponivel: " + cValToChar(nSldDisp) ,{"Ok"})
+		Aviso("VAL004", cMen004 + CRLF + " Saldo Disponivel: " + cValToChar(nSldDisp) ,{"Ok"})
 		lValido := .F.
 	EndIf
 
 	//Verifica se o pedido de compra existe 
-	If lValido .And. !(Posicione( "SC7", 1, xFilial("SC7")+cCR_NUM,"C7_NUM" ) == cCR_NUM)
-		Aviso("VAL005",cMen005 + CRLF + " Pedido: " + cCR_NUM,{"Ok"})
+	//If lValido .And. !(Posicione( "SC7", 1, xFilial("SC7")+cCR_NUM,"C7_NUM" ) == cCR_NUM)
+	If lValido .And. !( Alltrim(SC7->C7_NUM) == Alltrim(cCR_NUM) )
+		Aviso("VAL005", cMen005 + CRLF + " Pedido: " + cCR_NUM,{"Ok"})
 		lValido := .F.
 	EndIf
 	
 	If lValido .And. !VerLock(cCR_NUM, cCR_TIPO) //Verifica se o pedido de compra nao esta com lock
-		Aviso("VAL006",cMen006 + CRLF + " Pedido: " + cCR_NUM,{"Ok"})
+		Aviso("VAL006", cMen006 + CRLF + " Pedido: " + cCR_NUM,{"Ok"})
 		lValido := .F.
 	EndIf
+
+	If lValido .And. AllTrim(SCR->CR_USER) != AllTrim(cCUserLog)
+		Aviso("VAL007", cMen007, {"Ok"} )
+		lValido := .F.
+	EndIf
+	 
 
 	Return lValido
 *******************************************************************************
@@ -249,24 +279,6 @@ Static Function VerLock(cCR_NUM,cTipo) //| Verifica se o pedido de compra nao es
 
 	Return lRet
 
-*******************************************************************************
-Static Function MLibPed(lLiberou)//| Marca o Pedido como Liberado ....
-*******************************************************************************
-	If (SCR->CR_TIPO == "PC" .Or. SCR->CR_TIPO == "AE")
-		dbSelectArea("SC7")
-		cPCLib := SC7->C7_NUM
-		cPCUser:= SC7->C7_USER
-		While !SC7->(Eof()) .And. SC7->C7_FILIAL+Substr(SC7->C7_NUM,1,len(SC7->C7_NUM)) == xFilial("SC7")+Substr(SCR->CR_NUM,1,len(SC7->C7_NUM))
-			If lLiberou
-				Reclock("SC7",.F.)
-				SC7->C7_CONAPRO := "L"
-				MsUnlock()
-			EndIf
-			SC7->(dbSkip())
-		EndDo
-	EndIf
-
-	Return Nil 
 *******************************************************************************
 Static Function ResEnv()// Restaura o Ambiente
 *******************************************************************************
@@ -321,34 +333,42 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     oFontG := TFont():New('Calibri',,-15,.T.,lBolt := .F.) // Fonte Get
     
     oSay := TSay():New(013,014,{||"Número do Dcto : "}	,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(013,180,{||"Aprovador : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(013,346,{||"Total Dcto : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    oSay := TSay():New(013,152,{||"Aprovador : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    oSay := TSay():New(013,375,{||"Total Dcto : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
 
     oSay := TSay():New(033,014,{||"Emissão : "}			,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(033,180,{||"Fornecedor : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    oSay := TSay():New(033,152,{||"Fornecedor : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    oSay := TSay():New(033,375,{||"Data de Ref : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
     
-    oSay := TSay():New(053,014,{||"Data de Ref : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(053,180,{||"Observação : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    oSay := TSay():New(053,014,{||"Observação : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
     
     cTexto := ""
-    oTGDocto := TGet():New( 010,075,{||cCR_NUM}		,oDlg,096,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_NUM,,,, 		)
-    oTGAprov := TGet():New( 010,225,{||cCR_APROV}	,oDlg,105,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_APROV,,,, 	)
-    oTGAprov := TGet():New( 010,375,{||cCR_TOTAL}	,oDlg,105,015,"" ,,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_TOTAL,,,,	)
+    oTGDocto := TGet():New( 010,075,{||cCR_NUM}		,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_NUM,,,, 		)
+    oTGAprov := TGet():New( 010,197,{||cCR_APROV+" - "+cAK_Nome}	,oDlg,170,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_APROV+" - "+cAK_Nome,,,, 	)
+    oTGVlTot := TGet():New( 010,420,{||cCR_TOTAL}	,oDlg,070,015,"" ,,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_TOTAL,,,,	)
     
-    oTGEmiss := TGet():New( 030,075,{||cCR_EMISSAO}	,oDlg,096,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_EMISSAO,,,, 	)
-    oTGForne := TGet():New( 030,225,{||cTexto}		,oDlg,265,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cTexto,,,, 		)
+    oTGEmiss := TGet():New( 030,075,{||cCR_EMISSAO}	,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_EMISSAO,,,, 	)
+    oTGForne := TGet():New( 030,197,{||cCR_FORNECE}	,oDlg,170,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_FORNECE,,,,		)
+    oTGDataR := TGet():New( 030,420,{||cDataRef}	,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cDataRef,,,,		)
     
-    oTGDataR := TGet():New( 050,075,{||cTexto}		,oDlg,096,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cTexto,,,, 		)
-    oTGObser := TGet():New( 050,225,{||cCR_OBS}		,oDlg,265,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_OBS,,,, 		)
+    oTGObser := TGet():New( 050,075,{||cCR_OBS}		,oDlg,415,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_OBS,,,, 		)
     
-    oTBApro := TButton():New( 010, 513, "Aprovar"  ,oDlg,{|| Libera()			} , 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
+    oTBApro := TButton():New( 010, 513, "Aprovar"  ,oDlg,{|| Libera() 			} , 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
     oTBBloq := TButton():New( 030, 513, "Bloquear" ,oDlg,{|| alert("Bloquear")	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
     oTBCanc := TButton():New( 050, 513, "Cancelar" ,oDlg,{|| alert("Cancelar")	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )
+    
+    oTGDocto:SetContentAlign( CONTROL_ALIGN_CENTER )
+    oTGAprov:SetContentAlign( CONTROL_ALIGN_LEFT )
+    oTGVlTot:SetContentAlign( CONTROL_ALIGN_RIGHT )
+    oTGEmiss:SetContentAlign( CONTROL_ALIGN_CENTER )
+    oTGForne:SetContentAlign( CONTROL_ALIGN_LEFT )
+    oTGDataR:SetContentAlign( CONTROL_ALIGN_CENTER )
+    oTGObser:SetContentAlign( CONTROL_ALIGN_LEFT )
     
     
     oGrid  	:= GridLPCC():New(oDlg,aHeader,aCols,aPos,aTCol)
         
-    oDlg:Activate(,,,.T.,{||msgstop('Validou'),.T.},,{||msgstop('Iniciando')} )
+    oDlg:Activate(,,,.T.,{||},,{||} )
        
 Return
 *******************************************************************************
@@ -356,18 +376,18 @@ Static Function GetAHeader(aHeader, aTCol)
 *******************************************************************************
 	
 	aTCol[01] := Len("ITEM" )  
-    aTCol[02] := Len("CTA GER")  
-    aTCol[03] := Len("C. CUSTO")  
+    aTCol[02] := Len("CONTA GERENCIAL")  
+    aTCol[03] := Len("CENTRO DE CUSTO")  
     aTCol[04] := Len("QUANTIDADE")  
     aTCol[05] := Len("UNI")  
     aTCol[06] := Len("PREÇO")  
     aTCol[07] := Len("TOTAL")  
     aTCol[08] := Len("DESCRIÇÃO")  
-    aTCol[09] := Len("OBSERVAÇÀO")  
+    aTCol[09] := Len("OBSERVAÇÃO")  
 	
 	AAdd(aHeader, "ITEM" )
-	AAdd(aHeader, "CTA GER" )
-	AAdd(aHeader, "C. CUSTO" )
+	AAdd(aHeader, "CONTA GERENCIAL" )
+	AAdd(aHeader, "CENTRO DE CUSTO" )
 	AAdd(aHeader, "QUANTIDADE" )
 	AAdd(aHeader, "UNI" )
 	AAdd(aHeader, "PREÇO" )
@@ -382,11 +402,19 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
 *******************************************************************************
 	Local cSql := ""
 
-	cSql += "SELECT C7_FILIAL, C7_NUM, C7_ITEM, 'C7_CTAGER + ZG_DESCR ' C7_CTAGER, 'C7_CC' C7_CC, C7_QUANT, C7_UM, C7_PRECO, C7_TOTAL, C7_DESCRI, ' ' C7_OBSPRO "  
-	cSql += "FROM SC7010 "
-	cSql += "WHERE D_E_L_E_T_ = ' ' "
-	cSql += "AND C7_NUM = '000011' "
-	cSql += "AND C7_FILIAL = '09' "
+	cSql += "SELECT C7_FILIAL, C7_NUM, C7_ITEM, RTrim(C7_CTAGER) + ' - ' + RTrim(ZG_DESCR) AS C7_CTAGER, RTrim(C7_CC) + ' - ' + Ltrim(RTrim(CTT_DESC01)) AS C7_CC , C7_QUANT, C7_UM, C7_PRECO, C7_TOTAL, C7_DESCRI, " 
+	cSql += "Convert( Varchar(1000) , Convert( Varbinary(1000), C7_OBSPRO) ) AS C7_OBSPRO "
+	
+	cSql += "FROM "+RetSqlName("SC7")+" SC7 FULL JOIN "+RetSqlName("SZG")+" SZG "
+	cSql += "ON  SC7.C7_CTAGER = ZG_COD "
+	cSql += "AND ' '           = SZG.D_E_L_E_T_ "
+	cSql += "				FULL JOIN "+RetSqlName("CTT")+" CTT "
+	cSql += "ON  SC7.C7_CC = CTT_CUSTO "
+	cSql += "AND ' '           = CTT.D_E_L_E_T_ "
+
+	cSql += "WHERE SC7.D_E_L_E_T_ = ' ' " 
+	cSql += "AND   SC7.C7_NUM = '"+cCR_NUM+"' " 
+	cSql += "AND   SC7.C7_FILIAL = '"+xFilial("SC7")+"' " 
 	
 	U_ExecMySql( cSql, cCursor := "TPED" , lModo := "Q", lMostra := .T., lChange := .F. )
 	
@@ -398,12 +426,12 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
     While !EOF()
     
        cItemPC := Alltrim(TPED->C7_ITEM) 	//| Item Pedido de Compra	
-       cCtaGer := Alltrim(TPED->C7_CTAGER) 	//| Conta Gerente
+       cCtaGer := Alltrim(TPED->C7_CTAGER) 		//| Conta Gerente
        cCenCus := Alltrim(TPED->C7_CC) 		//| Contro de Custo
-       cQtdPed := Transform( TPED->C7_QUANT , "@E 99,999,999.99" )	//| Quantidade
+       cQtdPed := Transform(TPED->C7_QUANT, MASCARA )	//| Quantidade
        cUniMed := Alltrim(TPED->C7_UM) 		//| Unidade de Medida
-       cPrecoU := Transform( TPED->C7_PRECO , "@E 99,999,999.99" ) 	//| Preço Unitario
-       cValTot := Transform( TPED->C7_TOTAL , "@E 999,999,999.99" ) 	//| Total 
+       cPrecoU := Transform(TPED->C7_PRECO, MASCARA ) 	//| Preço Unitario
+       cValTot := Transform(TPED->C7_TOTAL, MASCARA ) 	//| Total 
        cDescri := Alltrim(TPED->C7_DESCRI) 	//| Descricao
        cObsPro := Alltrim(TPED->C7_OBSPRO) 	//| Observação Produto
        
@@ -447,7 +475,27 @@ Static Function Libera() // Executa a Liberacao do Pedido ...
 	*/
 	lLiberou := MaAlcDoc(aDocALib,dDataAtual,If(nOpc==2,4,6))
 
-
 	MLibPed(lLiberou)
+	
+	If lLiberou
+		Iw_MsgBox("Liberado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
+	EndIf
 
 	Return Nil
+*******************************************************************************
+Static Function MLibPed(lLiberou)//| Marca o Pedido como Liberado ....
+*******************************************************************************
+
+	If lLiberou .And. (SCR->CR_TIPO == "PC" .Or. SCR->CR_TIPO == "AE") 
+		dbSelectArea("SC7")
+		cPCLib := SC7->C7_NUM
+		cPCUser:= SC7->C7_USER
+		While !SC7->(Eof()) .And. SC7->C7_FILIAL+Substr(SC7->C7_NUM,1,len(SC7->C7_NUM)) == xFilial("SC7")+Substr(SCR->CR_NUM,1,len(SC7->C7_NUM))
+			Reclock("SC7",.F.)
+			SC7->C7_CONAPRO := "L"
+			MsUnlock()
+			SC7->(dbSkip())
+		EndDo
+	EndIf
+
+Return Nil 
