@@ -1,5 +1,5 @@
-#include 'protheus.ch'
-#include 'parmtype.ch'
+ 
+#Include 'Totvs.ch' 
 
 #Define CRLF Chr(13)+Chr(10)
 
@@ -15,7 +15,10 @@
 #Define SL_LIBOUTROU  "05" // Liberado por outro Usuario
 #Define SL_REJEITADO  "06" // Rejeitado
 
-#define CLR_GRAY RGB( 220, 220, 220 )
+//#define CLR_GRAY RGB( 128, 128, 128 ) // RGB( 120, 120, 120 )
+
+#Define LIBERAR 	2
+#Define BLOQUEAR 	3
 
 #Define CONTROL_ALIGN_LEFT 	 -1
 #Define CONTROL_ALIGN_CENTER  0
@@ -52,6 +55,7 @@
 User Function MT094LOK()
 *******************************************************************************
 
+	
 	//| Funcao para Declarar Variaveis Necessarias
 	DecVar()
 
@@ -111,8 +115,9 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 
 	_SetOwnerPrvt( 'dDataAtual'	, dDataBase ) //| DataBase do sistema
 	_SetOwnerPrvt( 'cDataRef'	, '' ) //| Data caracter atual 
-
-	_SetOwnerPrvt( 'aDocALib'	, {} ) //| Array contendo o Documento a Liberar ...
+	_SetOwnerPrvt( 'dDataRef'	, '' ) //| Data atual
+	
+//	_SetOwnerPrvt( 'aDocALib'	, {} ) //| Array contendo o Documento a Liberar ...
 	_SetOwnerPrvt( 'aRetSaldo'	, {} ) //| Retorna o saldo do aprovador.   Return {nSaldo,nMoeda,dDtSaldo}
 	_SetOwnerPrvt( 'nSldDisp'	, 0  ) //| Armazena o saldo disponivel para liberacao ja contando  o documento a ser liberado
 
@@ -131,18 +136,20 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 *******************************************************************************
 	Local lAprov := .F.
 
-
 	cCR_NUM 	:= Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
 	cCR_FORNECE := Posicione("SA2",1,xFilial("SA2")+SC7->C7_FORNECE+SC7->C7_LOJA ,"A2_NOME")
 	cCR_EMISSAO := DtoC(SCR->CR_EMISSAO)
 	cCR_APROV 	:= SCR->CR_APROV
-	cCR_GRUPO	:= SCR->CR_GRUPO
+	cCR_GRUPO	:= SCR->CR_GRUPO //GetUpdGrp()
 	cCR_APRORI  := SCR->CR_APRORI
 	cCR_STATUS  := SCR->CR_STATUS
 	cCR_TIPO	:= SCR->CR_TIPO
 	cCR_OBS		:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
 	
+	cCR_OBS 	:= Alltrim(cCR_OBS) + Replicate( " " , 1000 - Len( Alltrim(cCR_OBS) ) )
+	
 	cDataRef 	:= DtoC(dDataBase)
+	dDataRef 	:= dDataBase
 
 	aRetSaldo   := MaSalAlc(cCR_APROV,dDataAtual)
 
@@ -153,8 +160,6 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 	cAK_APROSUP := SAK->AK_APROSUP
 	cAK_Nome	:= SAK->AK_NOME
 	
-	aDocALib	:= {cCR_NUM,cCR_TIPO,nCR_TOTAL,cCR_APROV,,cCR_GRUPO,,,,,cCR_OBS}
-
 	If SAL->AL_LIBAPR != "A"
 		lAprov := .T.
 	EndIf
@@ -162,6 +167,26 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 	nSldDisp := aRetSaldo[P_SALDO] - IIF(lAprov,0,nCR_TOTAL)
 
 	Return Nil
+*******************************************************************************
+Static Function GetUpdGrp() // Atualiza e Pega o Grupo 
+*******************************************************************************
+	Local cGrupo := ""
+	Local cSql := ""
+	
+	cSql += "UPDATE "+RetSqlname("SCR")		
+	cSql += " SET CR_GRUPO = "+"'"+C7_APROV+"'"
+	cSql += " WHERE CR_FILIAL ='"+xFilial("SCR")+"' AND "
+	cSql += " CR_NUM ='"+C7_NUM+"' AND "
+	cSql += " D_E_L_E_T_ <> '*' "  	 
+	
+	
+	U_ExecMySql( cSql, cCursor := "" , lModo := "E", lMostra := .T., lChange := .F. )
+			
+	
+	cGrupo := C7_APROV
+			
+Return cGrupo
+	
 *******************************************************************************
 Static Function TabSel()  //| Selecionar e Ordenar Tabelas Envolvidas
 *******************************************************************************
@@ -304,8 +329,6 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     Local oGrid	:= Nil
     Local oGrouB:= Nil
     Local oGrouC:= Nil
-    Local oFont := Nil
-    Local oSay  := Nil
     
     Local oTGDocto := Nil
     Local oTGEmiss := Nil
@@ -321,50 +344,32 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     Local aHeader 	:= {}
     Local aCols		:= {}
   
-    GetAHeader( @aHeader, @aTCol ) 	//| Monta AHeader
-    GetAcols( @aCols, @aTCol )		//| Monta ACols
+    GetAHeader( @aHeader, @aTCol ) 	//| Monta o AHeader
+    GetAcols( @aCols, @aTCol )		//| Monta o ACols
      
+
+    oFontG := TFont():New('Calibri',,18,.T.,lBolt := .F.) // Fonte para uso no Get
+    oFontS := TFont():New('Calibri',,12,.T.,lBolt := .T.) // Fonte para uso no Say
+	
+	// Objetos Visuais  	
 	oDlg 	:= TDialog():New(050,050,700,1200,'Liberação de Docto',,,,,CLR_BLACK,CLR_WHITE,,,.T.,,,,,,)
     
     oGrouC	:= TGroup():New(005,005,070,500,'',oDlg,,,.T.)
     oGrouB	:= TGroup():New(005,505,070,571,'',oDlg,,,.T.)
     
-    oFontS := TFont():New('Calibri',,-15,.T.,lBolt := .T.) // Fonte Say
-    oFontG := TFont():New('Calibri',,-15,.T.,lBolt := .F.) // Fonte Get
+    MTGet( @oTGDocto, 010, 010, cCR_NUM					, oDlg, 060, 015, oFontG, "Número do Dcto : "	, oFontS, .T. , CONTROL_ALIGN_CENTER )
+    MTGet( @oTGAprov, 010, 140, cCR_APROV+" - "+cAK_Nome, oDlg, 201, 015, oFontG, "Aprovador : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   )
+    MTGet( @oTGVlTot, 010, 390, cCR_TOTAL				, oDlg, 065, 015, oFontG, "Total Dcto : "		, oFontS, .T. , CONTROL_ALIGN_RIGHT  )
     
-    oSay := TSay():New(013,014,{||"Número do Dcto : "}	,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(013,152,{||"Aprovador : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(013,375,{||"Total Dcto : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-
-    oSay := TSay():New(033,014,{||"Emissão : "}			,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(033,152,{||"Fornecedor : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    oSay := TSay():New(033,375,{||"Data de Ref : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
+    MTGet( @oTGEmiss, 030, 010, cCR_EMISSAO				, oDlg, 090, 015, oFontG, "Emissão : "			, oFontS, .T. , CONTROL_ALIGN_CENTER )
+    MTGet( @oTGForne, 030, 140, cCR_FORNECE				, oDlg, 200, 015, oFontG, "Fornecedor : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   )
+    MTGet( @oTGDataR, 030, 390, cDataRef				, oDlg, 060, 015, oFontG, "Data de Ref : "		, oFontS, .F. , CONTROL_ALIGN_CENTER )
     
-    oSay := TSay():New(053,014,{||"Observação : "}		,oDlg,,oFontS,,,,.T.,,,400,300,,,,,,.F.)
-    
-    cTexto := ""
-    oTGDocto := TGet():New( 010,075,{||cCR_NUM}		,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_NUM,,,, 		)
-    oTGAprov := TGet():New( 010,197,{||cCR_APROV+" - "+cAK_Nome}	,oDlg,170,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_APROV+" - "+cAK_Nome,,,, 	)
-    oTGVlTot := TGet():New( 010,420,{||cCR_TOTAL}	,oDlg,070,015,"" ,,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_TOTAL,,,,	)
-    
-    oTGEmiss := TGet():New( 030,075,{||cCR_EMISSAO}	,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_EMISSAO,,,, 	)
-    oTGForne := TGet():New( 030,197,{||cCR_FORNECE}	,oDlg,170,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_FORNECE,,,,		)
-    oTGDataR := TGet():New( 030,420,{||cDataRef}	,oDlg,070,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cDataRef,,,,		)
-    
-    oTGObser := TGet():New( 050,075,{||cCR_OBS}		,oDlg,415,015,"",,CLR_GRAY,,oFontG,.F.,,.T.,,.F.,,.F.,.F.,,.T.,.F.,,cCR_OBS,,,, 		)
-    
-    oTBApro := TButton():New( 010, 513, "Aprovar"  ,oDlg,{|| Libera() 			} , 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
-    oTBBloq := TButton():New( 030, 513, "Bloquear" ,oDlg,{|| alert("Bloquear")	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
-    oTBCanc := TButton():New( 050, 513, "Cancelar" ,oDlg,{|| alert("Cancelar")	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )
-    
-    oTGDocto:SetContentAlign( CONTROL_ALIGN_CENTER )
-    oTGAprov:SetContentAlign( CONTROL_ALIGN_LEFT )
-    oTGVlTot:SetContentAlign( CONTROL_ALIGN_RIGHT )
-    oTGEmiss:SetContentAlign( CONTROL_ALIGN_CENTER )
-    oTGForne:SetContentAlign( CONTROL_ALIGN_LEFT )
-    oTGDataR:SetContentAlign( CONTROL_ALIGN_CENTER )
-    oTGObser:SetContentAlign( CONTROL_ALIGN_LEFT )
-    
+    MTGet( @oTGObser, 050, 010, cCR_OBS					, oDlg, 440, 015, oFontG, "Observação : "		, oFontS, .F. , CONTROL_ALIGN_LEFT   )
+     
+    oTBApro := TButton():New( 010, 513, "Aprovar"  ,oDlg,{|| LibBloq(LIBERAR) , oDlg:End()	} , 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
+    oTBBloq := TButton():New( 030, 513, "Bloquear" ,oDlg,{|| LibBloq(BLOQUEAR), oDlg:End()	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
+    oTBCanc := TButton():New( 050, 513, "Cancelar" ,oDlg,{|| oDlg:End()						}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )
     
     oGrid  	:= GridLPCC():New(oDlg,aHeader,aCols,aPos,aTCol)
         
@@ -403,7 +408,7 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
 	Local cSql := ""
 
 	cSql += "SELECT C7_FILIAL, C7_NUM, C7_ITEM, RTrim(C7_CTAGER) + ' - ' + RTrim(ZG_DESCR) AS C7_CTAGER, RTrim(C7_CC) + ' - ' + Ltrim(RTrim(CTT_DESC01)) AS C7_CC , C7_QUANT, C7_UM, C7_PRECO, C7_TOTAL, C7_DESCRI, " 
-	cSql += "Convert( Varchar(1000) , Convert( Varbinary(1000), C7_OBSPRO) ) AS C7_OBSPRO "
+	cSql += "Convert( Varchar(1000) , Convert( Varbinary(1000), C7_OBS) ) AS C7_OBSPRO "
 	
 	cSql += "FROM "+RetSqlName("SC7")+" SC7 FULL JOIN "+RetSqlName("SZG")+" SZG "
 	cSql += "ON  SC7.C7_CTAGER = ZG_COD "
@@ -425,15 +430,15 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
     DbGoTop()
     While !EOF()
     
-       cItemPC := Alltrim(TPED->C7_ITEM) 	//| Item Pedido de Compra	
-       cCtaGer := Alltrim(TPED->C7_CTAGER) 		//| Conta Gerente
-       cCenCus := Alltrim(TPED->C7_CC) 		//| Contro de Custo
-       cQtdPed := Transform(TPED->C7_QUANT, MASCARA )	//| Quantidade
-       cUniMed := Alltrim(TPED->C7_UM) 		//| Unidade de Medida
-       cPrecoU := Transform(TPED->C7_PRECO, MASCARA ) 	//| Preço Unitario
-       cValTot := Transform(TPED->C7_TOTAL, MASCARA ) 	//| Total 
-       cDescri := Alltrim(TPED->C7_DESCRI) 	//| Descricao
-       cObsPro := Alltrim(TPED->C7_OBSPRO) 	//| Observação Produto
+       cItemPC := Alltrim( TPED->C7_ITEM) 	//| Item Pedido de Compra	
+       cCtaGer := Alltrim( Transform( TPED->C7_CTAGER, "@!") ) 		//| Conta Gerente
+       cCenCus := Alltrim( Transform( TPED->C7_CC, "@!") ) 		//| Contro de Custo
+       cQtdPed := Transform( TPED->C7_QUANT, MASCARA )	//| Quantidade
+       cUniMed := Alltrim( TPED->C7_UM) 		//| Unidade de Medida
+       cPrecoU := Transform( TPED->C7_PRECO, MASCARA ) 	//| Preço Unitario
+       cValTot := Transform( TPED->C7_TOTAL, MASCARA ) 	//| Total 
+       cDescri := Alltrim( Transform( TPED->C7_DESCRI, "@!") ) 	//| Descricao
+       cObsPro := Alltrim( Transform( TPED->C7_OBSPRO, "@!") ) 	//| Observação Produto
        
  
        // Defini o Tamanho Maximo de Cada Coluna
@@ -459,11 +464,11 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
 Return Nil 	
 
 *******************************************************************************
-Static Function Libera() // Executa a Liberacao do Pedido ...
+Static Function LibBloq(nOpc) // Executa a Liberacao do Pedido ...
 *******************************************************************************
 
 	// Liberacao
-	nOpc := 2 // 2-> Liberar  1->Cancelar  3->Bloquear
+	//nOpc := 2-> Liberar  1->Cancelar  3->Bloquear
 	/*
 	ExpN1 = Operacao a ser executada
 	1 = Inclusao do documento
@@ -473,12 +478,28 @@ Static Function Libera() // Executa a Liberacao do Pedido ...
 	5 = Estorno da Aprovacao
 	6 = Bloqueio Manual da Aprovacao
 	*/
-	lLiberou := MaAlcDoc(aDocALib,dDataAtual,If(nOpc==2,4,6))
-
-	MLibPed(lLiberou)
 	
-	If lLiberou
-		Iw_MsgBox("Liberado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
+	//aDocALib	:= {cCR_NUM,cCR_TIPO,nCR_TOTAL,cCR_APROV,,cCR_GRUPO,,,,,cCR_OBS}
+	
+	//Begin Transaction
+	
+	//lLiberou 	:= MaAlcDoc(aDocALib,dDataAtual,If(nOpc==2,4,6))
+	lLiberou := A097ProcLib(SCR->(Recno()),nOpc,nCR_TOTAL,cCR_APROV,cCR_GRUPO,cCR_OBS,dDataRef,NIL)
+	
+	//End Transaction
+	
+	Alert("lLiberou: " + cValToChar(lLiberou))
+	
+	//MLibPed(lLiberou)
+
+	If SCR->CR_STATUS == SL_LIBERADO .And. nOpc==LIBERAR
+
+		Iw_MsgBox( "Aprovado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
+
+	ElseIf SCR->CR_STATUS == SL_BLOQUEADO .And. nOpc==BLOQUEAR
+
+		Iw_MsgBox( "Bloqueado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
+	
 	EndIf
 
 	Return Nil
@@ -499,3 +520,39 @@ Static Function MLibPed(lLiberou)//| Marca o Pedido como Liberado ....
 	EndIf
 
 Return Nil 
+*******************************************************************************
+Static Function MTGet( _oGet, _nRow, _nCol, _bSetGet, _oWnd, _nWidth, _nHeight, _oFont, _cLabelText, _oLabelFont , _lReadOnly, _nAlign ) 
+*******************************************************************************
+
+Local nRow				:= _nRow		//| numérico		Indica a coordenada Vertical em pixels ou caracteres.
+Local nCol				:= _nCol		//| numérico		Indica a coordenada horizontal em pixels ou caracteres.
+Local bSetGet			:= {||_bSetGet}	//| bloco de código	Indica o bloco de código, no formato {|u| if( Pcount( )>0, := u, ) }, que será executado para atualizar a variável (essa variável deve ser do tipo caracter). Desta forma, se a lista for sequencial, o controle atualizará com o conteúdo do item selecionado, se for indexada, será atualizada com o valor do índice do item selecionado.
+Local oWnd				:= _oWnd		//| objeto			Indica a janela ou controle visual onde o objeto será criado.
+Local nWidth			:= _nWidth		//| numérico		Indica a largura em pixels do objeto.
+Local nHeight			:= _nHeight		//| numérico		Indica a altura em pixels do objeto.
+Local cPict				:= "@!"			//| caractere		Indica a máscara de formatação do conteúdo que será apresentada. Verificar Tabela de Pictures de Formatação
+Local bValid			:= Nil			//| bloco de código	Indica o bloco de código de validação que será executado quando o conteúdo do objeto for modificado. Retorna verdadeiro (.T.), se o conteúdo é válido; caso contrário, falso (.F.).
+Local nClrFore			:= Nil			//| numérico		Indica a cor do texto do objeto.
+Local nClrBack			:= CLR_GRAY		//| numérico		Indica a cor de fundo do objeto.
+Local oFont				:= _oFont		//| objeto			Indica o objeto, do tipo TFont, que será utilizado para definir as características da fonte aplicada na exibição do conteúdo do controle visual.
+Local lPixel			:= .T.			//| lógico			Indica se considera as coordenadas passadas em pixels (.T.) ou caracteres (.F.).
+Local bWhen				:= Nil			//| bloco de código	Indica o bloco de código que será executado quando a mudança de foco da entrada de dados no objeto criado estiver sendo realizada. Se o retorno for verdadeiro (.T.), o objeto continua habilitado; caso contrário, falso (.F.).
+Local bChange			:= Nil			//| bloco de código	Indica o bloco de código que será executado quando o estado ou conteúdo do objeto é modificado pela ação sobre o controle visual.
+Local lReadOnly			:= _lReadOnly	//| lógico			Indica se o objeto pode ser editado.
+Local lPassword			:= .F.			//| lógico			Indica se, verdadeiro (.T.), o objeto apresentará asterisco (*) para entrada de dados de senha; caso contrário, falso (.F.).
+Local cReadVar			:= _bSetGet		//| caractere		Indica o nome da variável, configurada no parâmetro bSetGet, que será manipulada pelo objeto. Além disso, esse parâmetro será o retorno da função ReadVar().
+Local lHasButton		:= .T.			//| lógico			Indica se, verdadeiro (.T.), o uso dos botões padrão, como calendário e calculadora.
+Local lNoButton			:= .T.			//| lógico			Oculta o botão F3 (HasButton).
+Local cLabelText		:= _cLabelText	//| caractere		indica o texto que será apresentado na Label.
+Local nLabelPos			:= 2			//| numérico		Indica a posição da label, sendo 1=Topo e 2=Esquerda
+Local oLabelFont		:= _oLabelFont	//| objeto			Indica o objeto, do tipo TFont, que será utilizado para definir as características da fonte aplicada na exibição da label.
+Local nLabelColor 		:= Nil			//| numérico		Indica a cor do texto da Label.
+Local cPlaceHold		:= Nil			//| caractere		Define o texto a ser utilizado como place holder, ou seja, o texto que ficará escrito em cor mais opaca quando nenhuma informação tiver sido digitada no campo. (disponível em builds superiores a 7.00.121227P)
+Local lPicturePriority	:= Nil			//| lógico	Quando .T. define que a quantidade de caracteres permitidos no TGet será baseada no tamanho da máscara (Picture) definida, mesmo que isto exceda a quantidade de caracteres definida na variável bSetGet, até mesmo se ela for vazia (essa variável deve ser do tipo caracter). Além disso este parâmetro ativa o controle dos espaços em branco, não incluindo na variável bSetGet os espaços inseridos automaticamente pela Picture. Ou seja, o TGet retornará somente os espaços em branco efetivamente digitados pelo usuário ou aqueles espaços que já foram inicializados na variável bSetGet. Disponível somente a partir da build 7.00.170117A.
+Local nAlign			:= _nAlign		//| Numerico 		Define o alinhamento LEFT = -1, CENTER = 0, RIGHT = 1
+ 
+    _oGet := TGet():New(nRow,nCol,bSetGet,oWnd,nWidth,nHeight,cPict,bValid,nClrFore,nClrBack,oFont,Nil,Nil,lPixel,Nil,Nil,bWhen,Nil,Nil,bChange,lReadOnly,lPassword,Nil,cReadVar,Nil,Nil,Nil,lHasButton,lNoButton,Nil,cLabelText,nLabelPos,oLabelFont,nLabelColor,cPlaceHold,lPicturePriority)
+
+    _oGet:SetContentAlign( nAlign )
+     
+Return Nil
