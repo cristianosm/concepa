@@ -161,7 +161,7 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 Static Function GetUpdGrp(cCR_GRUPO) // Se o Grupo estiver em Branco Preenche e o Retorna
 *******************************************************************************
 	Local cSql 		:= ""
-	Local cC7_APROV := SC7->(Posicione( "SC7", 1, xFilial("SC7")+cCR_NUM, "C7_APROV" )
+	Local cC7_APROV := SC7->(Posicione( "SC7", 1, xFilial("SC7")+cCR_NUM, "C7_APROV" ) )
 
 	If Empty(cCR_GRUPO) 
 	
@@ -171,7 +171,7 @@ Static Function GetUpdGrp(cCR_GRUPO) // Se o Grupo estiver em Branco Preenche e 
 		cSql += " CR_NUM ='"+cCR_NUM+"' AND "
 		cSql += " D_E_L_E_T_ = ' ' "  	 
 	
-		U_ExecMySql( cSql, cCursor := "", lModo := "E", lMostra := .T., lChange := .F. )
+		U_ExecMySql( cSql, cCursor := "", lModo := "E", lMostra := .F., lChange := .F. )
 	
 		cCR_GRUPO := C7_APROV
 			
@@ -342,7 +342,7 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     
     MTGet( @oTGDocto, 010, 010, @cCR_NUM		, 'cCR_NUM'		, oDlg, 060, 015, oFontG, "Número do Dcto : "	, oFontS, .T. , CONTROL_ALIGN_CENTER , "@!" 	)
     MTGet( @oTGAprov, 010, 140, @cAK_Nome		, 'cAK_Nome'	, oDlg, 201, 015, oFontG, "Aprovador : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   , "@!" 	)
-    MTGet( @oTGVlTot, 010, 390, @cCR_TOTAL		, 'cCR_TOTAL'	, oDlg, 065, 015, oFontG, "Total Dcto : "		, oFontS, .T. , CONTROL_ALIGN_RIGHT  , MASCARA 	)
+    MTGet( @oTGVlTot, 010, 390, @cCR_TOTAL		, 'cCR_TOTAL'	, oDlg, 065, 015, oFontG, "Total Dcto : "		, oFontS, .T. , CONTROL_ALIGN_RIGHT  , ''	 	)
     
     MTGet( @oTGEmiss, 030, 010, @cCR_EMISSAO	, 'cCR_EMISSAO'	, oDlg, 090, 015, oFontG, "Emissão : "			, oFontS, .T. , CONTROL_ALIGN_CENTER , "" 		)
     MTGet( @oTGForne, 030, 140, @cCR_FORNECE	, 'cCR_FORNECE'	, oDlg, 200, 015, oFontG, "Fornecedor : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   , "@!" 	)
@@ -404,7 +404,7 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados do Pedido e Alimenta o A
 	cSql += "AND   SC7.C7_NUM = '"+cCR_NUM+"' " 
 	cSql += "AND   SC7.C7_FILIAL = '"+xFilial("SC7")+"' " 
 	
-	U_ExecMySql( cSql, cCursor := "TPED" , lModo := "Q", lMostra := .T., lChange := .F. )
+	U_ExecMySql( cSql, cCursor := "TPED" , lModo := "Q", lMostra := .F., lChange := .F. )
 	
     DbSelectArea(cCursor)
     DbGoTop()
@@ -516,26 +516,28 @@ Local nAlign			:= _nAlign		//| Numerico 		Define o alinhamento LEFT = -1, CENTER
      
 Return Nil
 *******************************************************************************
-User Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o email com Pedido Pendente 
+Static Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o email com Pedido Pendente 
 *******************************************************************************
 
-	Local cBody 	:= ""
-	Local cFornece 	:= TPED->C7_FORNECE + " - " + cCR_FORNECE 
-	Local cSubject 	:= "Aprovar Pedido de Compra"
-	
+	Local cBody 	:= ""		// Corpo da mensagem
+	Local cSubject 	:= "Aprovar Pedido de Compra" // Assunto da Mensagem 
+	Local cTo		:= ""		// Destinatario da Mensagem
+	Local lSend		:= .F.		// Se deve ou nao enviar o email
 	
 	GetPed()  // Obtem o Pedido
 	
-	MntBody(@cBody) // Monta o Corpo da Mensagem  
+	MntBody(@cBody, @lSend) // Monta o Corpo da Mensagem  
 	
-	GetTo(@cTo) // Verifica pra Quem vai o email 
+	If lSend // So envia se houver itens do Pedido.... 
+		GetTo(@cTo) // Verifica pra Quem vai o email 
 	
-	// Envia o Email 
-	U_EnviaMail(cTo,'',cSubject,cBody)
+		// Envia o Email 
+		U_EnviaMail('cristianosm@gmail.com' /*cTo*/,'',cSubject,cBody)
+	EndIf
 	
 Return Nil
 *******************************************************************************
-Static Function GetPed()  // Obtem o Pedido
+Static Function GetPed(cFornece)  // Obtem o Pedido
 *******************************************************************************
 	Local cSql := ""
 	
@@ -545,12 +547,13 @@ Static Function GetPed()  // Obtem o Pedido
 	cSql += " AND   SC7.C7_FILIAL = '"+xFilial("SC7")+"' "
 	cSql += " AND   SC7.D_E_L_E_T_ = ' ' "
 
-	U_ExecMySql( cSql, cCursor := "TPED", lModo := "Q", lMostra := .T., lChange := .F. )
+	U_ExecMySql( cSql, cCursor := "TPED", lModo := "Q", lMostra := .F., lChange := .F. )
 
 Return Nil
 *******************************************************************************
-Static Function MntBody(cBody) // Monta o Corpo da Mensagem  
+Static Function MntBody(cBody, lSend) // Monta o Corpo da Mensagem  
 *******************************************************************************
+	Local cFornece 	:= TPED->C7_FORNECE + " - " + cCR_FORNECE 
 
 	StartBody(@cBody) // Inicializa o Corpo do e-mail 
 
@@ -570,9 +573,12 @@ Static Function MntBody(cBody) // Monta o Corpo da Mensagem
 		AAdd( aItem, DToC( SToD(C7_DATPRF ) ) )
 	
 		ImpItem(@cBody, aItem) // Monta Html do Item 
-	
-		nTotPed += aPed[xY,7]
-	
+		
+		lSend := .T.
+		
+		DbSelectArea("TPED")
+		DbSkip()
+		
 	EndDo
 	// Linha Total ao Final 
 	aItem := {'','','','','','Total Pedido: ', cCR_TOTAL } 
@@ -593,13 +599,13 @@ Static Function GetTo(cTo) // Verifica pra Quem vai o email
 	// Obtem o Codigo de Usuario do proximo aprovador 
 	cSql += " SELECT TOP 1 CR_USER FROM "+RetSqlName("SCR")
 	cSql += " WHERE CR_FILIAL  = '" + xFilial("SCR") +  "' "
-	cSql += " AND   CR_NUM     = '" + cPedido  +  "' "
+	cSql += " AND   CR_NUM     = '" + cCR_NUM  +  "' "
 	cSql += " AND   CR_TIPO    = 'PC' "
 	cSql += " AND   CR_USERLIB = ' ' "
 	cSql += " AND   D_E_L_E_T_ = ' ' "
 	cSql += " ORDER BY CR_NIVEL "
 	
-	U_ExecMySql( cSql, cCursor := "NUSE", lModo := "Q", lMostra := .T., lChange := .F. )
+	U_ExecMySql( cSql, cCursor := "NUSE", lModo := "Q", lMostra := .F., lChange := .F. )
 	
 	cUser := Alltrim(NUSE->CR_USER)
 
@@ -630,10 +636,10 @@ Static Function ImpCab(cRet, cPed, cFornece) //| Monta Html com Cabecalho dos it
 *******************************************************************************
 
 	cRet += '	<tr>'
-	cRet += '		<th colspan="3" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063;">Pedido de Compra: ' +  cPed + '</th>'
-	cRet += '		<th colspan="4" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063;">Fornecedor: ' +  cFornece + '</th>'
+	cRet += '		<th colspan="3" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063; text-align: left;">Pedido de Compra: ' +  cPed + '</th>'
+	cRet += '		<th colspan="4" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063; text-align: right;">Fornecedor: ' +  cFornece + '</th>'
 	cRet += '	</tr>'
-	cRet += '	<tr style="font-family: Verdana, Geneva, sans-serif; font-size: 14px; font-weight: bold; color: #FFF; background-color: #063; text-align: center;	border: 1px solid #063;">'
+	cRet += '	<tr style="font-family: Verdana, Geneva, sans-serif; font-size: 14px; font-weight: bold; color: #FFF; background-color: #000; text-align: center;	border: 1px solid #063;">'
 	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Item</th>'
 	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Codigo</th>'
 	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Descricao</th>'
