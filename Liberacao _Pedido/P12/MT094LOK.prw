@@ -1,7 +1,6 @@
- 
 #Include 'Totvs.ch' 
 
-#Define CRLF Chr(13)+Chr(10)
+#Define CRLF Chr(13)+Chr(10) // Enter
 
 #Define P_SALDO 1 //|Posicao do Saldo
 #Define P_MOEDA 2 //| Posicao da Moeda
@@ -15,16 +14,26 @@
 #Define SL_LIBOUTROU  "05" // Liberado por outro Usuario
 #Define SL_REJEITADO  "06" // Rejeitado
 
-//#define CLR_GRAY RGB( 128, 128, 128 ) // RGB( 120, 120, 120 )
+// Posicoes Pedido
+#Define _ITE_	1 // Item
+#Define _COD_	2 // Codigo
+#Define _DES_	3 // Descricao
+#Define _QTD_	4 // Quantidade
+#Define _VUN_	5 // Valor Unitario
+#Define _VTO_	6 // Valot Total 
+#Define _DTE_	7 // Data de Entrega
 
+// Comandos Aprovador 
 #Define LIBERAR 	2
 #Define BLOQUEAR 	3
 
+// Alinhamento Textos 
 #Define CONTROL_ALIGN_LEFT 	 -1
 #Define CONTROL_ALIGN_CENTER  0
 #Define CONTROL_ALIGN_RIGHT   1
 
-#Define MASCARA "@E 999,999.99"
+// Mascara para Numeros
+#Define MASCARA "@E 9,999,999.99"
 
 /*****************************************************************************\
 **---------------------------------------------------------------------------**
@@ -78,9 +87,7 @@ User Function MT094LOK()
 	//| Restaura o Ambiente
 	ResEnv()
 
-	Return lContinua
-
-
+	Return ( lContinua  )
 *******************************************************************************
 Static Function DecVar() //| Deeclaracao das Variaveis utilizadas 
 *******************************************************************************
@@ -98,31 +105,23 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 	_SetOwnerPrvt( 'cCR_APROV'	, ""  ) //| Codigo do Aprovador
 	_SetOwnerPrvt( 'cCR_GRUPO'	, ""  ) //| Grupo de Aprovacao
 	_SetOwnerPrvt( 'cCR_APRORI'	, ""  ) //| Codigo Aprovador Origem
-	_SetOwnerPrvt( 'cCR_STATUS'	, ""  ) //| Controle da Aprovacao
 	_SetOwnerPrvt( 'cCR_EMISSAO', ""  ) //| Data de emissao
 	_SetOwnerPrvt( 'cCR_OBS'	, ""  ) //| Obsevacoes da Aprovacao
 	_SetOwnerPrvt( 'cCR_TOTAL'	, ""  ) //| Valor Total Com Mascara
 	_SetOwnerPrvt( 'nCR_TOTAL'	, ""  ) //| Valor Total Numerico
 	
 	_SetOwnerPrvt( 'cAK_APROSUP', ""  ) // Aprovador Superior
-	_SetOwnerPrvt( 'cAK_Nome', ""  ) // Nome do Aprovador 
+	_SetOwnerPrvt( 'cAK_Nome'	, ""  ) // Nome do Aprovador 
 
-	_SetOwnerPrvt( 'cCUserLog', RetCodUsr()  ) // Usuario Logado 
-	_SetOwnerPrvt( 'cCUserName', UsrRetName(cCUserLog)  ) // Nome do Usuario Logado 
+	_SetOwnerPrvt( 'cCUserLog'	, RetCodUsr()  ) // Usuario Logado 
+	_SetOwnerPrvt( 'cCUserName'	, UsrRetName(cCUserLog)  ) // Nome do Usuario Logado 
 
-
-	// SAK->AK_APROSUP
-
-	_SetOwnerPrvt( 'dDataAtual'	, dDataBase ) //| DataBase do sistema
-	_SetOwnerPrvt( 'cDataRef'	, '' ) //| Data caracter atual 
 	_SetOwnerPrvt( 'dDataRef'	, '' ) //| Data atual
-	
-//	_SetOwnerPrvt( 'aDocALib'	, {} ) //| Array contendo o Documento a Liberar ...
+
 	_SetOwnerPrvt( 'aRetSaldo'	, {} ) //| Retorna o saldo do aprovador.   Return {nSaldo,nMoeda,dDtSaldo}
 	_SetOwnerPrvt( 'nSldDisp'	, 0  ) //| Armazena o saldo disponivel para liberacao ja contando  o documento a ser liberado
 
 	_SetOwnerPrvt( 'lContinua'	, .F. ) //| Define se Substitui Liberação Padrao
-
 
 	 aGetATU	:= GetArea()
 	 aGetSC7 	:= SC7->( GetArea() )
@@ -134,59 +133,52 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 *******************************************************************************
 Static Function GetVar() //| Funcao para Alimentar as Variaveis
 *******************************************************************************
-	Local lAprov := .F.
 
 	cCR_NUM 	:= Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
 	cCR_FORNECE := Posicione("SA2",1,xFilial("SA2")+SC7->C7_FORNECE+SC7->C7_LOJA ,"A2_NOME")
 	cCR_EMISSAO := DtoC(SCR->CR_EMISSAO)
 	cCR_APROV 	:= SCR->CR_APROV
-	cCR_GRUPO	:= SCR->CR_GRUPO //GetUpdGrp()
+	cCR_GRUPO	:= GetUpdGrp(SCR->CR_GRUPO)
 	cCR_APRORI  := SCR->CR_APRORI
-	cCR_STATUS  := SCR->CR_STATUS
 	cCR_TIPO	:= SCR->CR_TIPO
 	cCR_OBS		:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
 	
 	cCR_OBS 	:= Alltrim(cCR_OBS) + Replicate( " " , 1000 - Len( Alltrim(cCR_OBS) ) )
 	
-	cDataRef 	:= DtoC(dDataBase)
 	dDataRef 	:= dDataBase
 
-	aRetSaldo   := MaSalAlc(cCR_APROV,dDataAtual)
+	aRetSaldo   := MaSalAlc(cCR_APROV,dDataRef)
 
 	nCR_TOTAL 	:= xMoeda(SCR->CR_TOTAL, SCR->CR_MOEDA, aRetSaldo[P_MOEDA], SCR->CR_EMISSAO, , SCR->CR_TXMOEDA)
 
 	cCR_TOTAL   := Transform( nCR_TOTAL , MASCARA ) 
 	
-	cAK_APROSUP := SAK->AK_APROSUP
 	cAK_Nome	:= SAK->AK_NOME
 	
-	If SAL->AL_LIBAPR != "A"
-		lAprov := .T.
-	EndIf
-
-	nSldDisp := aRetSaldo[P_SALDO] - IIF(lAprov,0,nCR_TOTAL)
+	nSldDisp 	:= aRetSaldo[P_SALDO] - IIF(SAL->AL_LIBAPR != "A",0,nCR_TOTAL)
 
 	Return Nil
 *******************************************************************************
-Static Function GetUpdGrp() // Atualiza e Pega o Grupo 
+Static Function GetUpdGrp(cCR_GRUPO) // Se o Grupo estiver em Branco Preenche e o Retorna
 *******************************************************************************
-	Local cGrupo := ""
-	Local cSql := ""
+	Local cSql 		:= ""
+	Local cC7_APROV := SC7->(Posicione( "SC7", 1, xFilial("SC7")+cCR_NUM, "C7_APROV" )
+
+	If Empty(cCR_GRUPO) 
 	
-	cSql += "UPDATE "+RetSqlname("SCR")		
-	cSql += " SET CR_GRUPO = "+"'"+C7_APROV+"'"
-	cSql += " WHERE CR_FILIAL ='"+xFilial("SCR")+"' AND "
-	cSql += " CR_NUM ='"+C7_NUM+"' AND "
-	cSql += " D_E_L_E_T_ <> '*' "  	 
+		cSql += " UPDATE " + RetSqlname("SCR")		
+		cSql += " SET CR_GRUPO = "+"'"+cC7_APROV+"'"
+		cSql += " WHERE CR_FILIAL ='"+xFilial("SCR")+"' AND "
+		cSql += " CR_NUM ='"+cCR_NUM+"' AND "
+		cSql += " D_E_L_E_T_ = ' ' "  	 
 	
+		U_ExecMySql( cSql, cCursor := "", lModo := "E", lMostra := .T., lChange := .F. )
 	
-	U_ExecMySql( cSql, cCursor := "" , lModo := "E", lMostra := .T., lChange := .F. )
+		cCR_GRUPO := C7_APROV
 			
+	Endif
 	
-	cGrupo := C7_APROV
-			
-Return cGrupo
-	
+Return cCR_GRUPO	
 *******************************************************************************
 Static Function TabSel()  //| Selecionar e Ordenar Tabelas Envolvidas
 *******************************************************************************
@@ -276,7 +268,6 @@ Static Function ValLib() //| Validações para Ocorrer a Liberação...
 		Aviso("VAL007", cMen007, {"Ok"} )
 		lValido := .F.
 	EndIf
-	 
 
 	Return lValido
 *******************************************************************************
@@ -303,7 +294,6 @@ Static Function VerLock(cCR_NUM,cTipo) //| Verifica se o pedido de compra nao es
 	RestArea(aArea)
 
 	Return lRet
-
 *******************************************************************************
 Static Function ResEnv()// Restaura o Ambiente
 *******************************************************************************
@@ -325,18 +315,18 @@ Return Nil
 Static Function TelaLib() //|  Monta a Leta de Liberaçào
 *******************************************************************************
 
-  	Local oDlg	:= Nil
-    Local oGrid	:= Nil
-    Local oGrouB:= Nil
-    Local oGrouC:= Nil
+  	Local oDlg		:= Nil
+    Local oGrid		:= Nil
+    Local oGrouB	:= Nil
+    Local oGrouC	:= Nil
     
-    Local oTGDocto := Nil
-    Local oTGEmiss := Nil
-    Local oTGForne := Nil
-    Local oTGAprov := Nil
-    Local oTGDataR := Nil
-    Local oTGObser := Nil
-    Local oTGVlTot := Nil
+    Local oTGDocto 	:= Nil
+    Local oTGEmiss 	:= Nil
+    Local oTGForne 	:= Nil
+    Local oTGAprov 	:= Nil
+    Local oTGDataR 	:= Nil
+    Local oTGObser	:= Nil
+    Local oTGVlTot	:= Nil
    
     Local aPos 	:= {075,05,568,246}			//| Acols Posicao do Grid (Lin, Col, Comp, Altura)
     Local aTCol := {0,0,0,0,0,0,0,0,0,0}	//| Acols contendo Largura das Colunas
@@ -345,9 +335,8 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     Local aCols		:= {}
   
     GetAHeader( @aHeader, @aTCol ) 	//| Monta o AHeader
-    GetAcols( @aCols, @aTCol )		//| Monta o ACols
+    GetAcols( 	@aCols,	 @aTCol )		//| Monta o ACols
      
-
     oFontG := TFont():New('Calibri',,18,.T.,lBolt := .F.) // Fonte para uso no Get
     oFontS := TFont():New('Calibri',,12,.T.,lBolt := .T.) // Fonte para uso no Say
 	
@@ -357,15 +346,15 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     oGrouC	:= TGroup():New(005,005,070,500,'',oDlg,,,.T.)
     oGrouB	:= TGroup():New(005,505,070,571,'',oDlg,,,.T.)
     
-    MTGet( @oTGDocto, 010, 010, cCR_NUM					, oDlg, 060, 015, oFontG, "Número do Dcto : "	, oFontS, .T. , CONTROL_ALIGN_CENTER )
-    MTGet( @oTGAprov, 010, 140, cCR_APROV+" - "+cAK_Nome, oDlg, 201, 015, oFontG, "Aprovador : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   )
-    MTGet( @oTGVlTot, 010, 390, cCR_TOTAL				, oDlg, 065, 015, oFontG, "Total Dcto : "		, oFontS, .T. , CONTROL_ALIGN_RIGHT  )
+    MTGet( @oTGDocto, 010, 010, @cCR_NUM		, 'cCR_NUM'		, oDlg, 060, 015, oFontG, "Número do Dcto : "	, oFontS, .T. , CONTROL_ALIGN_CENTER , "@!" 	)
+    MTGet( @oTGAprov, 010, 140, @cAK_Nome		, 'cAK_Nome'	, oDlg, 201, 015, oFontG, "Aprovador : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   , "@!" 	)
+    MTGet( @oTGVlTot, 010, 390, @cCR_TOTAL		, 'cCR_TOTAL'	, oDlg, 065, 015, oFontG, "Total Dcto : "		, oFontS, .T. , CONTROL_ALIGN_RIGHT  , MASCARA 	)
     
-    MTGet( @oTGEmiss, 030, 010, cCR_EMISSAO				, oDlg, 090, 015, oFontG, "Emissão : "			, oFontS, .T. , CONTROL_ALIGN_CENTER )
-    MTGet( @oTGForne, 030, 140, cCR_FORNECE				, oDlg, 200, 015, oFontG, "Fornecedor : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   )
-    MTGet( @oTGDataR, 030, 390, cDataRef				, oDlg, 060, 015, oFontG, "Data de Ref : "		, oFontS, .F. , CONTROL_ALIGN_CENTER )
+    MTGet( @oTGEmiss, 030, 010, @cCR_EMISSAO	, 'cCR_EMISSAO'	, oDlg, 090, 015, oFontG, "Emissão : "			, oFontS, .T. , CONTROL_ALIGN_CENTER , "" 		)
+    MTGet( @oTGForne, 030, 140, @cCR_FORNECE	, 'cCR_FORNECE'	, oDlg, 200, 015, oFontG, "Fornecedor : "		, oFontS, .T. , CONTROL_ALIGN_LEFT   , "@!" 	)
+    MTGet( @oTGDataR, 030, 390, @dDataRef		, 'dDataRef'	, oDlg, 060, 015, oFontG, "Data de Ref : "		, oFontS, .F. , CONTROL_ALIGN_CENTER , ""  		)
     
-    MTGet( @oTGObser, 050, 010, cCR_OBS					, oDlg, 440, 015, oFontG, "Observação : "		, oFontS, .F. , CONTROL_ALIGN_LEFT   )
+    MTGet( @oTGObser, 050, 010, @cCR_OBS		, 'cCR_OBS'		, oDlg, 440, 015, oFontG, "Observação : "		, oFontS, .F. , CONTROL_ALIGN_LEFT   , "" 		)
      
     oTBApro := TButton():New( 010, 513, "Aprovar"  ,oDlg,{|| LibBloq(LIBERAR) , oDlg:End()	} , 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
     oTBBloq := TButton():New( 030, 513, "Bloquear" ,oDlg,{|| LibBloq(BLOQUEAR), oDlg:End()	}, 50,15,,,.F.,.T.,.F.,,.F.,,,.F. )   
@@ -403,7 +392,7 @@ Static Function GetAHeader(aHeader, aTCol)
 	
 Return Nil
 *******************************************************************************
-Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
+Static Function GetAcols(aCols, aTCol)// Obtem os Dados do Pedido e Alimenta o Acols
 *******************************************************************************
 	Local cSql := ""
 
@@ -460,77 +449,56 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados e Alimento o Acols
        
       EndDo
       
+      DbSelectArea(cCursor)
+      DbCloseArea()
 
 Return Nil 	
 
 *******************************************************************************
 Static Function LibBloq(nOpc) // Executa a Liberacao do Pedido ...
 *******************************************************************************
+	
+	Local lLiberou := .F. // Define se o Pedido foi Liberado ... 
 
-	// Liberacao
-	//nOpc := 2-> Liberar  1->Cancelar  3->Bloquear
-	/*
-	ExpN1 = Operacao a ser executada
-	1 = Inclusao do documento
-	2 = Transferencia para Superior
-	3 = Exclusao do documento
-	4 = Aprovacao do documento
-	5 = Estorno da Aprovacao
-	6 = Bloqueio Manual da Aprovacao
-	*/
-	
-	//aDocALib	:= {cCR_NUM,cCR_TIPO,nCR_TOTAL,cCR_APROV,,cCR_GRUPO,,,,,cCR_OBS}
-	
-	//Begin Transaction
-	
-	//lLiberou 	:= MaAlcDoc(aDocALib,dDataAtual,If(nOpc==2,4,6))
-	lLiberou := A097ProcLib(SCR->(Recno()),nOpc,nCR_TOTAL,cCR_APROV,cCR_GRUPO,cCR_OBS,dDataRef,NIL)
-	
-	//End Transaction
-	
-	Alert("lLiberou: " + cValToChar(lLiberou))
-	
-	//MLibPed(lLiberou)
 
-	If SCR->CR_STATUS == SL_LIBERADO .And. nOpc==LIBERAR
+	Begin Transaction
+		//nOpc := 2-> Liberar  1->Cancelar  3->Bloquear
+		lLiberou := A097ProcLib(SCR->(Recno()),nOpc,nCR_TOTAL,cCR_APROV,cCR_GRUPO,cCR_OBS,dDataRef,NIL)
+	End Transaction
+	
+
+	// Mensagem de Aprovacao ou Bloqueio
+	If SCR->CR_STATUS == SL_LIBERADO .And. nOpc == LIBERAR 
 
 		Iw_MsgBox( "Aprovado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
 
-	ElseIf SCR->CR_STATUS == SL_BLOQUEADO .And. nOpc==BLOQUEAR
+		If !lLiberou //| Documento Aprovado mas Pedido Nao... Deve enviar Email para o Proximo Aprovador  
+		
+			NextAprov() // Verifica o Proximo Aprovador Pendente 
+		
+		EndIf
+
+
+	ElseIf SCR->CR_STATUS == SL_BLOQUEADO .And. nOpc == BLOQUEAR
 
 		Iw_MsgBox( "Bloqueado com Sucesso !!!", "Documento : " + cCR_NUM, "INFO"  )
 	
 	EndIf
+	
+	
 
-	Return Nil
+Return Nil
 *******************************************************************************
-Static Function MLibPed(lLiberou)//| Marca o Pedido como Liberado ....
-*******************************************************************************
-
-	If lLiberou .And. (SCR->CR_TIPO == "PC" .Or. SCR->CR_TIPO == "AE") 
-		dbSelectArea("SC7")
-		cPCLib := SC7->C7_NUM
-		cPCUser:= SC7->C7_USER
-		While !SC7->(Eof()) .And. SC7->C7_FILIAL+Substr(SC7->C7_NUM,1,len(SC7->C7_NUM)) == xFilial("SC7")+Substr(SCR->CR_NUM,1,len(SC7->C7_NUM))
-			Reclock("SC7",.F.)
-			SC7->C7_CONAPRO := "L"
-			MsUnlock()
-			SC7->(dbSkip())
-		EndDo
-	EndIf
-
-Return Nil 
-*******************************************************************************
-Static Function MTGet( _oGet, _nRow, _nCol, _bSetGet, _oWnd, _nWidth, _nHeight, _oFont, _cLabelText, _oLabelFont , _lReadOnly, _nAlign ) 
+Static Function MTGet( _oGet, _nRow, _nCol, _bSetGet, _cVAr,  _oWnd, _nWidth, _nHeight, _oFont, _cLabelText, _oLabelFont , _lReadOnly, _nAlign, _cMasc ) 
 *******************************************************************************
 
 Local nRow				:= _nRow		//| numérico		Indica a coordenada Vertical em pixels ou caracteres.
 Local nCol				:= _nCol		//| numérico		Indica a coordenada horizontal em pixels ou caracteres.
-Local bSetGet			:= {||_bSetGet}	//| bloco de código	Indica o bloco de código, no formato {|u| if( Pcount( )>0, := u, ) }, que será executado para atualizar a variável (essa variável deve ser do tipo caracter). Desta forma, se a lista for sequencial, o controle atualizará com o conteúdo do item selecionado, se for indexada, será atualizada com o valor do índice do item selecionado.
+Local bSetGet			:= {|u| if( Pcount()>0, _bSetGet:=u, _bSetGet)} //{||_bSetGet}	//| bloco de código	Indica o bloco de código, no formato {|u| if( Pcount( )>0, := u, ) }, que será executado para atualizar a variável (essa variável deve ser do tipo caracter). Desta forma, se a lista for sequencial, o controle atualizará com o conteúdo do item selecionado, se for indexada, será atualizada com o valor do índice do item selecionado.
 Local oWnd				:= _oWnd		//| objeto			Indica a janela ou controle visual onde o objeto será criado.
 Local nWidth			:= _nWidth		//| numérico		Indica a largura em pixels do objeto.
 Local nHeight			:= _nHeight		//| numérico		Indica a altura em pixels do objeto.
-Local cPict				:= "@!"			//| caractere		Indica a máscara de formatação do conteúdo que será apresentada. Verificar Tabela de Pictures de Formatação
+Local cPict				:= _cMasc 		//| caractere		Indica a máscara de formatação do conteúdo que será apresentada. Verificar Tabela de Pictures de Formatação
 Local bValid			:= Nil			//| bloco de código	Indica o bloco de código de validação que será executado quando o conteúdo do objeto for modificado. Retorna verdadeiro (.T.), se o conteúdo é válido; caso contrário, falso (.F.).
 Local nClrFore			:= Nil			//| numérico		Indica a cor do texto do objeto.
 Local nClrBack			:= CLR_GRAY		//| numérico		Indica a cor de fundo do objeto.
@@ -540,11 +508,11 @@ Local bWhen				:= Nil			//| bloco de código	Indica o bloco de código que será ex
 Local bChange			:= Nil			//| bloco de código	Indica o bloco de código que será executado quando o estado ou conteúdo do objeto é modificado pela ação sobre o controle visual.
 Local lReadOnly			:= _lReadOnly	//| lógico			Indica se o objeto pode ser editado.
 Local lPassword			:= .F.			//| lógico			Indica se, verdadeiro (.T.), o objeto apresentará asterisco (*) para entrada de dados de senha; caso contrário, falso (.F.).
-Local cReadVar			:= _bSetGet		//| caractere		Indica o nome da variável, configurada no parâmetro bSetGet, que será manipulada pelo objeto. Além disso, esse parâmetro será o retorno da função ReadVar().
+Local cReadVar			:= _cVAr		//| caractere		Indica o nome da variável, configurada no parâmetro bSetGet, que será manipulada pelo objeto. Além disso, esse parâmetro será o retorno da função ReadVar().
 Local lHasButton		:= .T.			//| lógico			Indica se, verdadeiro (.T.), o uso dos botões padrão, como calendário e calculadora.
 Local lNoButton			:= .T.			//| lógico			Oculta o botão F3 (HasButton).
 Local cLabelText		:= _cLabelText	//| caractere		indica o texto que será apresentado na Label.
-Local nLabelPos			:= 2			//| numérico		Indica a posição da label, sendo 1=Topo e 2=Esquerda
+Local nLabelPos			:=  2			//| numérico		Indica a posição da label, sendo 1=Topo e 2=Esquerda
 Local oLabelFont		:= _oLabelFont	//| objeto			Indica o objeto, do tipo TFont, que será utilizado para definir as características da fonte aplicada na exibição da label.
 Local nLabelColor 		:= Nil			//| numérico		Indica a cor do texto da Label.
 Local cPlaceHold		:= Nil			//| caractere		Define o texto a ser utilizado como place holder, ou seja, o texto que ficará escrito em cor mais opaca quando nenhuma informação tiver sido digitada no campo. (disponível em builds superiores a 7.00.121227P)
@@ -555,4 +523,153 @@ Local nAlign			:= _nAlign		//| Numerico 		Define o alinhamento LEFT = -1, CENTER
 
     _oGet:SetContentAlign( nAlign )
      
+Return Nil
+*******************************************************************************
+User Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o email com Pedido Pendente 
+*******************************************************************************
+
+	Local cBody 	:= ""
+	Local cFornece 	:= TPED->C7_FORNECE + " - " + cCR_FORNECE 
+	Local cSubject 	:= "Aprovar Pedido de Compra"
+	
+	
+	GetPed()  // Obtem o Pedido
+	
+	MntBody(@cBody) // Monta o Corpo da Mensagem  
+	
+	GetTo(@cTo) // Verifica pra Quem vai o email 
+	
+	// Envia o Email 
+	U_EnviaMail(cTo,'',cSubject,cBody)
+	
+Return Nil
+*******************************************************************************
+Static Function GetPed()  // Obtem o Pedido
+*******************************************************************************
+	Local cSql := ""
+	
+	cSql += " SELECT C7_FILIAL, C7_NUM, C7_ITEM, C7_PRODUTO, C7_DESCRI, C7_QUANT, C7_TOTAL, C7_DATPRF, C7_PRECO, C7_CONAPRO, C7_FORNECE, C7_LOJA " 
+	cSql += " FROM "+RetSqlName("SC7")+" SC7 " 
+	cSql += " WHERE SC7.C7_NUM = '"+cCR_NUM+"' " 
+	cSql += " AND   SC7.C7_FILIAL = '"+xFilial("SC7")+"' "
+	cSql += " AND   SC7.D_E_L_E_T_ = ' ' "
+
+	U_ExecMySql( cSql, cCursor := "TPED", lModo := "Q", lMostra := .T., lChange := .F. )
+
+Return Nil
+*******************************************************************************
+Static Function MntBody(cBody) // Monta o Corpo da Mensagem  
+*******************************************************************************
+
+	StartBody(@cBody) // Inicializa o Corpo do e-mail 
+
+	DbSelectArea("TPED");DbGoTop()
+	While !EOF()
+	
+		ImpCab(@cBody, cCR_NUM, cFornece) //  Monta Html com Cabecalho dos itens 
+	
+		aItem := {}
+		
+		AAdd( aItem, Alltrim( TPED->C7_ITEM ) )
+		AAdd( aItem, Alltrim( TPED->C7_PRODUTO ) )
+		AAdd( aItem, Alltrim( TPED->C7_DESCRI ) ) 
+		AAdd( aItem, Transform( TPED->C7_QUANT, MASCARA ) )
+		AAdd( aItem, Transform( TPED->C7_PRECO, MASCARA ) )
+		AAdd( aItem, Transform( TPED->C7_TOTAL, MASCARA ) )
+		AAdd( aItem, DToC( SToD(C7_DATPRF ) ) )
+	
+		ImpItem(@cBody, aItem) // Monta Html do Item 
+	
+		nTotPed += aPed[xY,7]
+	
+	EndDo
+	// Linha Total ao Final 
+	aItem := {'','','','','','Total Pedido: ', cCR_TOTAL } 
+	
+	ImpItem(@cBody, aItem) // Monta Html do Item 
+	
+	DbSelectArea("TPED")
+	DbCloseArea()
+
+Return Nil 
+*******************************************************************************
+Static Function GetTo(cTo) // Verifica pra Quem vai o email 
+*******************************************************************************
+
+	Local cSql 	:= ""
+	Local cUser := ""
+	
+	// Obtem o Codigo de Usuario do proximo aprovador 
+	cSql += " SELECT TOP 1 CR_USER FROM "+RetSqlName("SCR")
+	cSql += " WHERE CR_FILIAL  = '" + xFilial("SCR") +  "' "
+	cSql += " AND   CR_NUM     = '" + cPedido  +  "' "
+	cSql += " AND   CR_TIPO    = 'PC' "
+	cSql += " AND   CR_USERLIB = ' ' "
+	cSql += " AND   D_E_L_E_T_ = ' ' "
+	cSql += " ORDER BY CR_NIVEL "
+	
+	U_ExecMySql( cSql, cCursor := "NUSE", lModo := "Q", lMostra := .T., lChange := .F. )
+	
+	cUser := Alltrim(NUSE->CR_USER)
+
+	DBSelectArea("NUSE");Dbclosearea()
+
+	PswOrder(1)
+	If PswSeek(cUser,.T.)
+		aUser := PswRet(1)
+	Endif
+		
+	If !Empty(aUser[1][14]) // Campo Email do Usuario 
+		cTo := Alltrim(aUser[1][14])
+	Endif
+
+Return
+*******************************************************************************
+Static Function StartBody(cBody) // Inicializa o Corpo do e-mail 
+*******************************************************************************
+
+	cBody += '<font color="#ff0000" face="Arial" size="3"><strong>Pedido de Compra Pendente de libera&ccedil;&atilde;o</strong></font>'
+	cBody += '<br><br>'
+	cBody += '<table width="800" border="0" align="center" cellpadding="5" cellspacing="0" rules="all" style="border: 1px solid #063; border-collapse: collapse;">'
+
+
+Return Nil
+*******************************************************************************
+Static Function ImpCab(cRet, cPed, cFornece) //| Monta Html com Cabecalho dos itens 
+*******************************************************************************
+
+	cRet += '	<tr>'
+	cRet += '		<th colspan="3" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063;">Pedido de Compra: ' +  cPed + '</th>'
+	cRet += '		<th colspan="4" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063;">Fornecedor: ' +  cFornece + '</th>'
+	cRet += '	</tr>'
+	cRet += '	<tr style="font-family: Verdana, Geneva, sans-serif; font-size: 14px; font-weight: bold; color: #FFF; background-color: #063; text-align: center;	border: 1px solid #063;">'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Item</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Codigo</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Descricao</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Quant.</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Val.Unit. R$</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Val.Total R$</th>'
+	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Dt Entrega</th>'
+	cRet += '	</tr>'
+	
+Return Nil
+*******************************************************************************
+Static Function ImpItem(cRet, aItem) //| Monta Html do Item 
+*******************************************************************************
+
+	cRet += '<tr>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: left; 	border: 1px solid #063;">' + aItem[_ITE_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: left; 	border: 1px solid #063;">' + aItem[_COD_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: left; 	border: 1px solid #063;">' + aItem[_DES_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: right; 	border: 1px solid #063;">' + aItem[_QTD_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: right; 	border: 1px solid #063;">' + aItem[_VUN_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: right; 	border: 1px solid #063;">' + aItem[_VTO_] + '</td>'
+	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: center; 	border: 1px solid #063;">' + aItem[_DTE_] + '</td>'
+	cRet += '</tr>'
+
+
+	If Empty(aItem[_ITE_]) // Se for Linha Final encerra a Tabela
+		cRet += '</table>'
+	EndIf
+	
 Return Nil

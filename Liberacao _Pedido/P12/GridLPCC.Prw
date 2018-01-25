@@ -15,7 +15,7 @@
 #Define P_WID 3 //| Comprimento do Grid
 #Define P_HEI 4 //| Altura do Grid
 
-#Define NPPC 08 //| Numero de Pixel por Caracter 
+#Define NPPC 07 //| Numero de Pixel por Caracter 
 
 //#Define CONTROL_ALIGN_LEFT 	 -1
 #Define CONTROL_ALIGN_CENTER  0
@@ -80,7 +80,7 @@ Method New(oDlg, aHeader, aData, aPos, aTCol) Class GridLPCC
 	
 	::oGrid:Align	:= CONTROL_ALIGN_ALLCLIENT //| Indica o alinhamento do texto na coluna.
 
-	oFont := TFont():New('Arial',,16,.T.)
+	oFont := TFont():New('Arial',,14,.T.)
 	::oGrid:SetFont(oFont)
 	
 	// Define o a Altura da Linha do Grid
@@ -119,7 +119,7 @@ Method New(oDlg, aHeader, aData, aPos, aTCol) Class GridLPCC
 		If nC == 1 .Or. nC == 5 
 			::oGrid:addColumn( nC, aHeader[nC] , aTCol[nC] * 11 , CONTROL_ALIGN_CENTER ) // Especifico para o Item
 		ElseIf nC == 2 .Or. nC == 3 .or. nC == 8 .Or. nC == 9
-			::oGrid:addColumn( nC, aHeader[nC] , Round(aTCol[nC] * 7.8,0) , CONTROL_ALIGN_LEFT   )
+			::oGrid:addColumn( nC, aHeader[nC] , Round(aTCol[nC] * 7,0) , CONTROL_ALIGN_LEFT   )
 		ElseIf nC == 4 .Or. nC == 6 .Or. nC == 7
 			::oGrid:addColumn( nC, aHeader[nC] , aTCol[nC] * NPPC , CONTROL_ALIGN_RIGHT  )
 		Else
