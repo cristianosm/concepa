@@ -142,7 +142,6 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 	cCR_APRORI  := SCR->CR_APRORI
 	cCR_TIPO	:= SCR->CR_TIPO
 	cCR_OBS		:= IIF(!Empty(SCR->CR_OBS),SCR->CR_OBS,CriaVar("CR_OBS"))
-	
 	cCR_OBS 	:= Alltrim(cCR_OBS) + Replicate( " " , 1000 - Len( Alltrim(cCR_OBS) ) )
 	
 	dDataRef 	:= dDataBase
@@ -305,11 +304,6 @@ Static Function ResEnv()// Restaura o Ambiente
 	RestArea(aGetSAL)
 	RestArea(aGetATU)
 
-	DbSelectArea("SC7")
-	If ExistBlock("MT097END")
-		///ExecBlock("MT097END",.F.,.F.,{cDocto,cTipo,nOpc,cFilDoc})
-	EndIf
-
 Return Nil
 *******************************************************************************
 Static Function TelaLib() //|  Monta a Leta de Liberaçào
@@ -335,7 +329,7 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
     Local aCols		:= {}
   
     GetAHeader( @aHeader, @aTCol ) 	//| Monta o AHeader
-    GetAcols( 	@aCols,	 @aTCol )		//| Monta o ACols
+    GetAcols( 	@aCols,	 @aTCol )	//| Monta o ACols
      
     oFontG := TFont():New('Calibri',,18,.T.,lBolt := .F.) // Fonte para uso no Get
     oFontS := TFont():New('Calibri',,12,.T.,lBolt := .T.) // Fonte para uso no Say
@@ -366,7 +360,7 @@ Static Function TelaLib() //|  Monta a Leta de Liberaçào
        
 Return
 *******************************************************************************
-Static Function GetAHeader(aHeader, aTCol)
+Static Function GetAHeader(aHeader, aTCol) // Monta o AHeader
 *******************************************************************************
 	
 	aTCol[01] := Len("ITEM" )  
@@ -412,9 +406,6 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados do Pedido e Alimenta o A
 	
 	U_ExecMySql( cSql, cCursor := "TPED" , lModo := "Q", lMostra := .T., lChange := .F. )
 	
-     
-    // Cria os Dados                     
-                             
     DbSelectArea(cCursor)
     DbGoTop()
     While !EOF()
