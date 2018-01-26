@@ -524,6 +524,12 @@ Static Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o e
 	Local cTo		:= ""		// Destinatario da Mensagem
 	Local lSend		:= .F.		// Se deve ou nao enviar o email
 	
+	// Cores Utilizadas no CSS 
+	Static C_GrayD := '#6E6E6E' // Cinza Escuro
+	Static C_GrayN := '#A4A4A4' // Cinza 
+	Static C_GrayL := '#F2F2F2' // Cinza Claro 
+	Static C_Red   := '#FA5858' // Vermelho
+	
 	GetPed()  // Obtem o Pedido
 	
 	MntBody(@cBody, @lSend) // Monta o Corpo da Mensagem  
@@ -581,7 +587,7 @@ Static Function MntBody(cBody, lSend) // Monta o Corpo da Mensagem
 		
 	EndDo
 	// Linha Total ao Final 
-	aItem := {'','','','','','Total Pedido: ', cCR_TOTAL } 
+	aItem := {'','','','','',cCR_TOTAL, ''  } 
 	
 	ImpItem(@cBody, aItem) // Monta Html do Item 
 	
@@ -624,17 +630,23 @@ Return
 *******************************************************************************
 Static Function StartBody(cBody) // Inicializa o Corpo do e-mail 
 *******************************************************************************
-
+/*
 	cBody += '<font color="#ff0000" face="Arial" size="3"><strong>Pedido de Compra Pendente de libera&ccedil;&atilde;o</strong></font>'
 	cBody += '<br><br>'
 	cBody += '<table width="800" border="0" align="center" cellpadding="5" cellspacing="0" rules="all" style="border: 1px solid #063; border-collapse: collapse;">'
-
+*/
+	cBody += '<!DOCTYPE html>'
+	cBody += '<html>'
+	cBody += '<head><style></style></head>'
+	cBody += '<body>'
+	cBody += '<br><br><font color="' + C_Red + '" face="Arial" size="5"><strong>Pedido de Compra Pendente de liberação...</strong></font><br><br>'
 
 Return Nil
 *******************************************************************************
-Static Function ImpCab(cRet, cPed, cFornece) //| Monta Html com Cabecalho dos itens 
+Static Function ImpCab(cBody, cPed, cFornece) //| Monta Html com Cabecalho dos itens 
 *******************************************************************************
 
+/*
 	cRet += '	<tr>'
 	cRet += '		<th colspan="3" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063; text-align: left;">Pedido de Compra: ' +  cPed + '</th>'
 	cRet += '		<th colspan="4" scope="col" style="border-top-width: 0px; border-right-width: 0px; border-bottom-width: 1px; border-left-width: 0px; border-top-style: none; border-right-style: none; border-bottom-style: solid; border-left-style: none; border-top-color: #063; border-right-color: #063; border-bottom-color: #FFF; border-left-color: #063; text-align: right;">Fornecedor: ' +  cFornece + '</th>'
@@ -648,12 +660,59 @@ Static Function ImpCab(cRet, cPed, cFornece) //| Monta Html com Cabecalho dos it
 	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Val.Total R$</th>'
 	cRet += '		<th scope="col" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: #FFF; border-right-color: #FFF; border-bottom-color: #FFF; border-left-color: #063;">Dt Entrega</th>'
 	cRet += '	</tr>'
+*/
+
+	cBody += '<table style="font-family: Lucida Grande, sans-serif; border-collapse: collapse; width: 100%; background-color: white; border: 2px solid ' + C_GrayD+ '; max-width: 1000px; align: center; ">'
 	
+	cBody += '  <tr style="border: 1px solid ' + C_GrayD+ '; background-color: ' + C_Red + '; color: black; height: 35px;">'
+	cBody += '    <td colspan="3" Style="text-align: left;" ><strong>PEDIDO DE COMPRA : </strong>' +  cPed + '</td>'
+	cBody += '    <td colspan="4" Style="text-align: right;" ><strong>FORNECEDOR : </strong>' +  cFornece + '</td>'
+	cBody += '  </tr>'
+	
+	cBody += '  <tr style="text-transform: uppercase; background-color: ' + C_GrayN + '; color: white; border: 2px solid ' + C_GrayD+ '; height: 30px;">'
+	cBody += '    <th>Item</th>'
+	cBody += '    <th>Codigo</th>'
+	cBody += '    <th>Descricao</th>'
+	cBody += '    <th>Quantidade</th>'
+	cBody += '    <th>Valor Unit</th>'
+	cBody += '    <th>Valor Total</th>'    
+	cBody += '    <th>Data Entrega</th>'
+	cBody += '  </tr>'
+
 Return Nil
 *******************************************************************************
-Static Function ImpItem(cRet, aItem) //| Monta Html do Item 
+Static Function ImpItem(cBody, aItem) //| Monta Html do Item 
 *******************************************************************************
 
+	Local lPar    := Mod( Val(aItem[_ITE_]) , 2 ) == 0 // Retorna se o Numero eh PAR 
+	Local cCssTrP := 'style="border: 1px solid ' + C_GrayD+ '; height: 27px;"' //| CSS para Linhas Pares 
+	Local cCssTrI := 'style="border: 1px solid ' + C_GrayD+ '; background-color: ' + C_GrayL + '; height: 27px;"' //| CSS para Linhas Impares
+	Local cCssTdC := 'style="border: 1px solid ' + C_GrayD+ '; padding: 6px; text-align: ' //| CSS cada Campo
+	Local lLinTot := Empty(aItem[_ITE_]) // Retorna .T. caso seja a Linha Totais... 
+	
+	If !lLinTot
+
+		cBody += '<tr '+If(lPar,cCssTrP,cCssTrI)+'> '
+		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_ITE_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_COD_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_DES_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_QTD_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_VUN_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_VTO_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_DTE_] + '</td>'
+		cBody += '</tr>'
+	
+	Else // Linha Total 
+
+		cBody += '<tr style="text-transform: uppercase; background-color: ' + C_GrayN + '; color: white; border: 2px solid ' + C_GrayD+ '; height: 30px;">'
+		cBody += '<td colspan="5" style="text-align: right; padding: 6px;"><strong>VALOR TOTAL : </strong></td>'
+		cBody += '<td colspan="1" style=" text-align: right; padding: 6px;"><strong>'+cCR_TOTAL+'</strong></td>'
+		cBody += '<td></td>'
+    	cBody += '</tr>'
+
+	EndIf
+	
+	/*
 	cRet += '<tr>'
 	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: left; 	border: 1px solid #063;">' + aItem[_ITE_] + '</td>'
 	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: left; 	border: 1px solid #063;">' + aItem[_COD_] + '</td>'
@@ -663,10 +722,19 @@ Static Function ImpItem(cRet, aItem) //| Monta Html do Item
 	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: right; 	border: 1px solid #063;">' + aItem[_VTO_] + '</td>'
 	cRet += '	<td style="font-family: Verdana, Geneva, sans-serif; font-size: 12px; text-align: center; 	border: 1px solid #063;">' + aItem[_DTE_] + '</td>'
 	cRet += '</tr>'
-
-
+	
 	If Empty(aItem[_ITE_]) // Se for Linha Final encerra a Tabela
 		cRet += '</table>'
 	EndIf
+	*/
 	
 Return Nil
+*******************************************************************************
+Static Function EndBody(cBody) // Inicializa o Corpo do e-mail 
+*******************************************************************************
+
+cBody += '</table>'
+cBody += '</body>'
+cBody += '</html>'
+
+Return Nil 
