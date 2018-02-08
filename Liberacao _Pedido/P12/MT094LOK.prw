@@ -152,7 +152,7 @@ Static Function GetVar() //| Funcao para Alimentar as Variaveis
 
 	cCR_TOTAL   := Transform( nCR_TOTAL , MASCARA ) 
 	
-	cAK_Nome	:= SAK->AK_NOME
+	cAK_Nome	:= cCR_APROV + " - " + SAK->AK_NOME
 	
 	nSldDisp 	:= aRetSaldo[P_SALDO] - IIF(SAL->AL_LIBAPR != "A",0,nCR_TOTAL)
 
