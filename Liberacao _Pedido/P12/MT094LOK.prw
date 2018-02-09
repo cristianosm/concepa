@@ -538,7 +538,7 @@ Static Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o e
 		GetTo(@cTo) // Verifica pra Quem vai o email 
 	
 		// Envia o Email 
-		U_EnviaMail('michele.ribaski@triunfoconcepa.com.br' /*cTo*/,'',cSubject,cBody)
+		U_EnviaMail(cTo,'',cSubject,cBody)
 	EndIf
 	
 Return Nil
