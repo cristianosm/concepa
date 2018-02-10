@@ -71,11 +71,11 @@ User Function MT094LOK()
 	//| Selecionar e Ordenar Tabelas Envolvidas
 	TabSel()
 	
-	//| Funcao para Alimentar as Variaveis
-	GetVar()
-
 	//| Posiciona as Tabelas Envolvidas
 	PosReg()
+
+	//| Funcao para Alimentar as Variaveis
+	GetVar()
 
 	//| Validações
 	If ValLib()
@@ -98,11 +98,11 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 	_SetOwnerPrvt( 'aGetSAK'	, {}  ) //| Salva Area SAK
 	_SetOwnerPrvt( 'aGetSAL'	, {}  ) //| Salva Area SAL
 
-	_SetOwnerPrvt( 'cCR_NUM'	, ""  ) //| Documento a ser Liberado
+	_SetOwnerPrvt( 'cCR_NUM'	, Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))  ) //| Documento a ser Liberado
 	_SetOwnerPrvt( 'cCR_FORNECE', ""  ) //| Codigo do Fornecedor
 	
 	_SetOwnerPrvt( 'cCR_TIPO'	, ""  ) //| Tipo do Documento
-	_SetOwnerPrvt( 'cCR_APROV'	, ""  ) //| Codigo do Aprovador
+	_SetOwnerPrvt( 'cCR_APROV'	, SCR->CR_APROV  ) //| Codigo do Aprovador
 	_SetOwnerPrvt( 'cCR_GRUPO'	, ""  ) //| Grupo de Aprovacao
 	_SetOwnerPrvt( 'cCR_APRORI'	, ""  ) //| Codigo Aprovador Origem
 	_SetOwnerPrvt( 'cCR_EMISSAO', ""  ) //| Data de emissao
@@ -134,10 +134,8 @@ Static Function DecVar() //| Deeclaracao das Variaveis utilizadas
 Static Function GetVar() //| Funcao para Alimentar as Variaveis
 *******************************************************************************
 
-	cCR_NUM 	:= Substr(SCR->CR_NUM,1,Len(SC7->C7_NUM))
-	cCR_FORNECE := Posicione("SA2",1,xFilial("SA2")+SC7->C7_FORNECE+SC7->C7_LOJA ,"A2_NOME")
+	cCR_FORNECE := SC7->(Posicione("SA2",1,xFilial("SA2")+SC7->C7_FORNECE+SC7->C7_LOJA ,"A2_NOME"))
 	cCR_EMISSAO := DtoC(SCR->CR_EMISSAO)
-	cCR_APROV 	:= SCR->CR_APROV
 	cCR_GRUPO	:= GetUpdGrp(SCR->CR_GRUPO)
 	cCR_APRORI  := SCR->CR_APRORI
 	cCR_TIPO	:= SCR->CR_TIPO
@@ -391,7 +389,7 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados do Pedido e Alimenta o A
 	Local cSql := ""
 
 	cSql += "SELECT C7_FILIAL, C7_NUM, C7_ITEM, RTrim(C7_CTAGER) + ' - ' + RTrim(ZG_DESCR) AS C7_CTAGER, RTrim(C7_CC) + ' - ' + Ltrim(RTrim(CTT_DESC01)) AS C7_CC , C7_QUANT, C7_UM, C7_PRECO, C7_TOTAL, C7_DESCRI, " 
-	cSql += "Convert( Varchar(1000) , Convert( Varbinary(1000), C7_OBS) ) AS C7_OBSPRO "
+	cSql += "Convert( Varchar(1000) , Convert( Varbinary(1000), C7_OBSPRO) ) AS C7_OBSPRO "
 	
 	cSql += "FROM "+RetSqlName("SC7")+" SC7 FULL JOIN "+RetSqlName("SZG")+" SZG "
 	cSql += "ON  SC7.C7_CTAGER = ZG_COD "
