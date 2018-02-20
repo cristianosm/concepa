@@ -561,10 +561,10 @@ Static Function MntBody(cBody, lSend) // Monta o Corpo da Mensagem
 
 	StartBody(@cBody) // Inicializa o Corpo do e-mail 
 
+	ImpCab(@cBody, cCR_NUM, cFornece) //  Monta Html com Cabecalho dos itens 
+	
 	DbSelectArea("TPED");DbGoTop()
 	While !EOF()
-	
-		ImpCab(@cBody, cCR_NUM, cFornece) //  Monta Html com Cabecalho dos itens 
 	
 		aItem := {}
 		
@@ -589,6 +589,8 @@ Static Function MntBody(cBody, lSend) // Monta o Corpo da Mensagem
 	
 	ImpItem(@cBody, aItem) // Monta Html do Item 
 	
+	EndBody(@cBody)
+	 
 	DbSelectArea("TPED")
 	DbCloseArea()
 
@@ -697,7 +699,7 @@ Static Function ImpItem(cBody, aItem) //| Monta Html do Item
 
 Return Nil
 *******************************************************************************
-Static Function EndBody(cBody) // Inicializa o Corpo do e-mail 
+Static Function EndBody(cBody) // Finaliza o Corpo do e-mail 
 *******************************************************************************
 
 cBody += '</table>'
