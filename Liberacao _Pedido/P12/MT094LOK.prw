@@ -536,7 +536,7 @@ Static Function NextAprov() // Verifica o Proximo Aprovador Pendente e Envia o e
 		GetTo(@cTo) // Verifica pra Quem vai o email 
 	
 		// Envia o Email 
-		U_EnviaMail(cTo,'',cSubject,cBody)
+		U_EnviaMail(cTo ,'',cSubject,cBody)
 	EndIf
 	
 Return Nil
@@ -676,7 +676,7 @@ Static Function ImpItem(cBody, aItem) //| Monta Html do Item
 		cBody += '<tr '+If(lPar,cCssTrP,cCssTrI)+'> '
 		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_ITE_] + '</td>'
 		cBody += '	<td ' + cCssTdC + 'center";>' + aItem[_COD_] + '</td>'
-		cBody += '	<td ' + cCssTdC + 'Left";>' + aItem[_DES_] + '</td>'
+		cBody += '	<td ' + cCssTdC + 'Left";>'   + aItem[_DES_] + '</td>'
 		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_QTD_] + '</td>'
 		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_VUN_] + '</td>'
 		cBody += '	<td ' + cCssTdC + 'right";>'  + aItem[_VTO_] + '</td>'
@@ -685,9 +685,9 @@ Static Function ImpItem(cBody, aItem) //| Monta Html do Item
 	
 	Else // Linha Total 
 		If lPar
-			cBody += '<tr style="text-transform: uppercase; background-color: ' + Cor_LinImp + '; color: white; border: 2px solid ' + Cor_Border+ '; height: 27px;">'
+			cBody += '<tr style="text-transform: uppercase; background-color: white; color: white; border: 2px solid ' + Cor_Border+ '; height: 27px;">'	
 		Else
-			cBody += '<tr style="text-transform: uppercase; background-color: white; color: white; border: 2px solid ' + Cor_Border+ '; height: 27px;">'
+			cBody += '<tr style="text-transform: uppercase; background-color: ' + Cor_LinImp + '; color: white; border: 2px solid ' + Cor_Border+ '; height: 27px;">'
 		EndIf
 		cBody += '<td colspan="5" style="text-align: right; padding: 6px;color: ' + 'Black ' /*Cor_FraCab*/ + '"><strong>VALOR TOTAL : </strong></td>'
 		cBody += '<td colspan="1" style="text-align: right; padding: 6px;color: ' + 'Black ' /*Cor_FraCab*/ + '"><strong>'+cCR_TOTAL+'</strong></td>'
