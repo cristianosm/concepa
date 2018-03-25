@@ -416,7 +416,7 @@ Static Function GetAcols(aCols, aTCol)// Obtem os Dados do Pedido e Alimenta o A
        cPrecoU := Transform( TPED->C7_PRECO, MASCARA ) 	//| Preço Unitario
        cValTot := Transform( TPED->C7_TOTAL, MASCARA ) 	//| Total 
        cDescri := Alltrim( Transform( TPED->C7_DESCRI, "@!") ) 	//| Descricao
-       cObsPro := Alltrim( Transform( TPED->C7_OBSPRO, "@!") ) 	//| Observação Produto
+       cObsPro := Alltrim( TPED->C7_OBSPRO ) //| Observação Produto
        
  
        // Defini o Tamanho Maximo de Cada Coluna
